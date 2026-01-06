@@ -17,7 +17,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Request logging
 app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - FROM: ${ip}`);
     next();
 });
 
@@ -50,7 +51,7 @@ app.use((err, req, res, next) => {
 startBasketCleanup(db);
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 Anti-Gaspi API Server`);
     console.log(`📡 Server running on http://localhost:${PORT}`);
     console.log(`🗄️  Database: ${dbPath}`);

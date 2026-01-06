@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+const { authenticate } = require('../middleware/auth');
 
 function createAuthRoutes(db) {
     const router = express.Router();
@@ -128,6 +129,95 @@ function createAuthRoutes(db) {
             }
         }
     );
+
+    /**
+     * PUT /api/auth/update
+     * Update user profile
+     */
+    router.put('/update', authenticate, async (req, res) => {
+        const { name, email, password, address, latitude, longitude, businessName, description, phone } = req.body;
+        const userId = req.user.userId;
+
+        try {
+            // Update basic user info
+            const updates = [];
+            const params = [];
+
+            if (name) { updates.push('name = ?'); params.push(name); }
+            if (email) { updates.push('email = ?'); params.push(email); }
+            if (address) { updates.push('address = ?'); params.push(address); }
+            if (latitude) { updates.push('latitude = ?'); params.push(latitude); }
+            if (longitude) { updates.push('longitude = ?'); params.push(longitude); }
+
+            if (updates.length > 0) {
+                params.push(userId);
+                db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+            }
+
+            // Update password if provided
+            if (password) {
+                const hashedPassword = await bcrypt.hash(password, 10);
+                db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, userId);
+            }
+
+            // Update merchant info if applicable
+            if (req.user.role === 'merchant') {
+                const merchantUpdates = [];
+                const merchantParams = [];
+
+                if (businessName) { merchantUpdates.push('business_name = ?'); merchantParams.push(businessName); }
+                if (description) { merchantUpdates.push('description = ?'); merchantParams.push(description); }
+                if (phone) { merchantUpdates.push('phone = ?'); merchantParams.push(phone); }
+
+                if (merchantUpdates.length > 0) {
+                    merchantParams.push(userId);
+                    db.prepare(`UPDATE merchants SET ${merchantUpdates.join(', ')} WHERE user_id = ?`).run(...merchantParams);
+                }
+            }
+
+            // Fetch updated user to return
+            const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+
+            // Get merchant ID if merchant
+            let merchantId = null;
+            if (user.role === 'merchant') {
+                const merchant = db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(user.id);
+                merchantId = merchant ? merchant.id : null;
+            }
+
+            res.json({
+                message: 'Profil mis à jour',
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    role: user.role,
+                    name: user.name,
+                    merchantId
+                }
+            });
+        } catch (error) {
+            console.error('Update error:', error);
+            res.status(500).json({ error: 'Erreur lors de la mise à jour' });
+        }
+    });
+
+    /**
+     * DELETE /api/auth/delete
+     * Delete user account
+     */
+    router.delete('/delete', authenticate, (req, res) => {
+        const userId = req.user.userId;
+
+        try {
+            // Because of ON DELETE CASCADE, deleting user will delete merchant info, baskets, and reservations
+            db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+
+            res.json({ message: 'Compte supprimé avec succès' });
+        } catch (error) {
+            console.error('Delete error:', error);
+            res.status(500).json({ error: 'Erreur lors de la suppression du compte' });
+        }
+    });
 
     return router;
 }
