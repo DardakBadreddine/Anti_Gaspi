@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -14,6 +14,7 @@ const ScannerScreen = ({ navigation }) => {
     const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
     const [validating, setValidating] = useState(false);
+    const lastScannedRef = useRef({ code: null, time: 0 });
 
     useEffect(() => {
         if (!permission?.granted) {
@@ -22,7 +23,21 @@ const ScannerScreen = ({ navigation }) => {
     }, [permission]);
 
     const handleBarCodeScanned = async ({ data }) => {
-        if (scanned || validating) return;
+        // Prevent duplicate scans
+        if (scanned || validating) {
+            console.log('⏸️ Scan blocked: already processing');
+            return;
+        }
+
+        const now = Date.now();
+        // Prevent scanning the same code within 3 seconds
+        if (lastScannedRef.current.code === data && now - lastScannedRef.current.time < 3000) {
+            console.log('⏸️ Scan blocked: duplicate within 3 seconds');
+            return;
+        }
+
+        console.log('📷 QR Code scanned:', data);
+        lastScannedRef.current = { code: data, time: now };
 
         setScanned(true);
         setValidating(true);

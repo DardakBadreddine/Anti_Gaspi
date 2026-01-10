@@ -9,7 +9,7 @@ import {
     TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { searchBaskets, deleteBasket } from '../../api/baskets';
+import { searchBaskets, deleteBasket, reactivateBasket } from '../../api/baskets';
 import { useAuth } from '../../contexts/AuthContext';
 import CountdownTimer from '../../components/CountdownTimer';
 import Button from '../../components/Button';
@@ -67,6 +67,36 @@ const MerchantBasketsScreen = ({ navigation }) => {
         );
     };
 
+    const handleReactivate = (basket) => {
+        Alert.prompt(
+            'Réactiver le panier',
+            `Combien de "${basket.title}" voulez-vous remettre en vente ?`,
+            [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                    text: 'Réactiver',
+                    onPress: async (quantity) => {
+                        const qty = parseInt(quantity);
+                        if (isNaN(qty) || qty < 1) {
+                            Alert.alert('Erreur', 'Veuillez entrer une quantité valide');
+                            return;
+                        }
+
+                        try {
+                            await reactivateBasket(basket.id, qty);
+                            Alert.alert('Succès', 'Panier réactivé !');
+                            loadBaskets();
+                        } catch (error) {
+                            Alert.alert('Erreur', 'Impossible de réactiver le panier');
+                        }
+                    }
+                }
+            ],
+            'plain-text',
+            '1'
+        );
+    };
+
     const renderBasket = ({ item }) => {
         const discount = Math.round(
             ((item.original_price - item.discounted_price) / item.original_price) * 100
@@ -100,12 +130,20 @@ const MerchantBasketsScreen = ({ navigation }) => {
                     <Text style={styles.quantity}>
                         {item.available_quantity}/{item.quantity} disponible{item.available_quantity > 1 ? 's' : ''}
                     </Text>
-                    <TouchableOpacity
-                        onPress={() => handleDelete(item.id, item.title)}
-                        style={styles.deleteButton}
-                    >
-                        <Text style={styles.deleteText}>🗑️ Supprimer</Text>
-                    </TouchableOpacity>
+                    <View style={styles.actions}>
+                        <TouchableOpacity
+                            onPress={() => handleReactivate(item)}
+                            style={styles.reactivateButton}
+                        >
+                            <Text style={styles.reactivateText}>🔄 Réactiver</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => handleDelete(item.id, item.title)}
+                            style={styles.deleteButton}
+                        >
+                            <Text style={styles.deleteText}>🗑️ Supprimer</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
         );
@@ -131,7 +169,7 @@ const MerchantBasketsScreen = ({ navigation }) => {
                 renderItem={renderBasket}
                 contentContainerStyle={[
                     styles.listContent,
-                    { paddingBottom: 100 }
+                    { paddingBottom: 20 + Math.max(insets.bottom, 10) }
                 ]}
                 refreshControl={
                     <RefreshControl refreshing={loading} onRefresh={loadBaskets} />
@@ -262,6 +300,19 @@ const styles = StyleSheet.create({
     quantity: {
         fontSize: 14,
         color: '#6b7280',
+    },
+    actions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    reactivateButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    reactivateText: {
+        fontSize: 14,
+        color: '#22c55e',
+        fontWeight: '600',
     },
     deleteButton: {
         paddingHorizontal: 12,

@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 
 // Auth screens
@@ -14,12 +15,16 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import SearchScreen from '../screens/customer/SearchScreen';
 import BasketDetailsScreen from '../screens/customer/BasketDetailsScreen';
 import ReservationsScreen from '../screens/customer/ReservationsScreen';
-
+import FavoritesScreen from '../screens/customer/FavoritesScreen';
+import HistoryScreen from '../screens/customer/HistoryScreen';
+import StatsScreen from '../screens/customer/StatsScreen';
+import RateExperienceScreen from '../screens/customer/RateExperienceScreen';
 // Merchant screens
 import AddBasketScreen from '../screens/merchant/AddBasketScreen';
 import MerchantBasketsScreen from '../screens/merchant/MerchantBasketsScreen';
 import ScannerScreen from '../screens/merchant/ScannerScreen';
 import MerchantReservationsScreen from '../screens/merchant/MerchantReservationsScreen';
+import MerchantStatsScreen from '../screens/merchant/MerchantStatsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
@@ -27,6 +32,8 @@ const Tab = createBottomTabNavigator();
 
 // Customer Tab Navigator
 const CustomerTabs = () => {
+    const insets = useSafeAreaInsets();
+
     return (
         <Tab.Navigator
             screenOptions={{
@@ -37,14 +44,13 @@ const CustomerTabs = () => {
                     backgroundColor: '#fff',
                     borderTopWidth: 1,
                     borderTopColor: '#f3f4f6',
-                    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+                    paddingBottom: Math.max(insets.bottom, 10),
                     paddingTop: 10,
-                    height: Platform.OS === 'ios' ? 85 : 70,
+                    height: 60 + Math.max(insets.bottom, 10),
                 },
                 tabBarLabelStyle: {
                     fontSize: 12,
                     fontWeight: '500',
-                    marginBottom: Platform.OS === 'ios' ? 0 : 5,
                 }
             }}
         >
@@ -59,10 +65,20 @@ const CustomerTabs = () => {
                 }}
             />
             <Tab.Screen
+                name="Favorites"
+                component={FavoritesScreen}
+                options={{
+                    tabBarLabel: 'Favoris',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="heart" size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tab.Screen
                 name="Reservations"
                 component={ReservationsScreen}
                 options={{
-                    tabBarLabel: 'Mes Réservations',
+                    tabBarLabel: 'Réservations',
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="list" size={size} color={color} />
                     ),
@@ -74,6 +90,8 @@ const CustomerTabs = () => {
 
 // Merchant Tab Navigator
 const MerchantTabs = () => {
+    const insets = useSafeAreaInsets();
+
     return (
         <Tab.Navigator
             screenOptions={{
@@ -84,14 +102,13 @@ const MerchantTabs = () => {
                     backgroundColor: '#fff',
                     borderTopWidth: 1,
                     borderTopColor: '#f3f4f6',
-                    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+                    paddingBottom: Math.max(insets.bottom, 10),
                     paddingTop: 10,
-                    height: Platform.OS === 'ios' ? 85 : 70,
+                    height: 60 + Math.max(insets.bottom, 10),
                 },
                 tabBarLabelStyle: {
                     fontSize: 12,
                     fontWeight: '500',
-                    marginBottom: Platform.OS === 'ios' ? 0 : 5,
                 }
             }}
         >
@@ -122,6 +139,16 @@ const MerchantTabs = () => {
                     tabBarLabel: 'Réservations',
                     tabBarIcon: ({ color, size }) => (
                         <Ionicons name="clipboard" size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="MerchantStats"
+                component={MerchantStatsScreen}
+                options={{
+                    tabBarLabel: 'Statistiques',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="stats-chart" size={size} color={color} />
                     ),
                 }}
             />
@@ -157,6 +184,21 @@ const AppNavigator = () => {
                         name="BasketDetails"
                         component={BasketDetailsScreen}
                         options={{ title: 'Détails du panier' }}
+                    />
+                    <Stack.Screen
+                        name="History"
+                        component={HistoryScreen}
+                        options={{ title: 'Historique' }}
+                    />
+                    <Stack.Screen
+                        name="Stats"
+                        component={StatsScreen}
+                        options={{ title: 'Mon Impact' }}
+                    />
+                    <Stack.Screen
+                        name="RateExperience"
+                        component={RateExperienceScreen}
+                        options={{ title: 'Donner mon avis' }}
                     />
                     <Stack.Screen
                         name="Profile"

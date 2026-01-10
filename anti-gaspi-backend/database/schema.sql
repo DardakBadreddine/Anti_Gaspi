@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS baskets (
   original_price REAL NOT NULL,
   discounted_price REAL NOT NULL,
   quantity INTEGER NOT NULL DEFAULT 1,
+  category TEXT DEFAULT 'Autre',
+  image_url TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   expires_at DATETIME NOT NULL,
   FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
@@ -47,14 +49,49 @@ CREATE TABLE IF NOT EXISTS reservations (
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'collected', 'cancelled')),
   reserved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   collected_at DATETIME,
+  delivery_option TEXT DEFAULT 'pickup',
+  delivery_fee REAL DEFAULT 0,
+  proof_photo TEXT,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (basket_id) REFERENCES baskets(id) ON DELETE CASCADE
+);
+
+-- Favorites table
+CREATE TABLE IF NOT EXISTS favorites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  merchant_id INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+  UNIQUE(user_id, merchant_id)
+);
+
+-- Reviews table
+CREATE TABLE IF NOT EXISTS reviews (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  merchant_id INTEGER NOT NULL,
+  reservation_id INTEGER NOT NULL,
+  rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+  comment TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+  FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE,
+  UNIQUE(reservation_id)
 );
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_location ON users(latitude, longitude);
 CREATE INDEX IF NOT EXISTS idx_baskets_expires ON baskets(expires_at);
 CREATE INDEX IF NOT EXISTS idx_baskets_merchant ON baskets(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_baskets_category ON baskets(category);
 CREATE INDEX IF NOT EXISTS idx_reservations_user ON reservations(user_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_basket ON reservations(basket_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_qr ON reservations(qr_code);
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_merchant ON favorites(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_merchant ON reviews(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_reservation ON reviews(reservation_id);

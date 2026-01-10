@@ -7,10 +7,12 @@ import {
     RefreshControl,
     Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMerchantReservations } from '../../api/reservations';
 import ProfileHeaderButton from '../../components/ProfileHeaderButton';
 
 const MerchantReservationsScreen = () => {
+    const insets = useSafeAreaInsets();
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -34,11 +36,18 @@ const MerchantReservationsScreen = () => {
             <View style={styles.card}>
                 <View style={styles.header}>
                     <View style={styles.headerLeft}>
-                        <Text style={styles.title} numberOfLines={1}>
-                            {item.title}
-                        </Text>
-                        <Text style={styles.customer}>👤 {item.customer_name}</Text>
-                        <Text style={styles.email}>{item.customer_email}</Text>
+                        <View style={styles.customerRow}>
+                            <View style={styles.avatar}>
+                                <Text style={styles.avatarText}>{item.customer_name?.charAt(0) || 'U'}</Text>
+                            </View>
+                            <View style={styles.customerInfo}>
+                                <Text style={styles.title} numberOfLines={1}>
+                                    {item.title}
+                                </Text>
+                                <Text style={styles.customer}>👤 {item.customer_name}</Text>
+                                <Text style={styles.email}>{item.customer_email}</Text>
+                            </View>
+                        </View>
                     </View>
                     <View
                         style={[
@@ -76,7 +85,7 @@ const MerchantReservationsScreen = () => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.headerContainer}>
+            <View style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 20) + 20 }]}>
                 <View style={styles.headerTop}>
                     <View>
                         <Text style={styles.headerTitle}>Réservations</Text>
@@ -92,7 +101,7 @@ const MerchantReservationsScreen = () => {
                 data={reservations}
                 keyExtractor={(item) => item.id.toString()}
                 renderItem={renderReservation}
-                contentContainerStyle={styles.listContent}
+                contentContainerStyle={[styles.listContent, { paddingBottom: 20 + Math.max(insets.bottom, 10) }]}
                 refreshControl={
                     <RefreshControl refreshing={loading} onRefresh={loadReservations} />
                 }
@@ -120,7 +129,7 @@ const styles = StyleSheet.create({
     headerContainer: {
         backgroundColor: '#fff',
         padding: 20,
-        paddingTop: 60,
+        // paddingTop: dynamic from insets
         borderBottomLeftRadius: 24,
         borderBottomRightRadius: 24,
         shadowColor: '#000',
@@ -167,6 +176,27 @@ const styles = StyleSheet.create({
     headerLeft: {
         flex: 1,
         marginRight: 12,
+    },
+    customerRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    avatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#22c55e',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    avatarText: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#fff',
+    },
+    customerInfo: {
+        flex: 1,
     },
     title: {
         fontSize: 18,

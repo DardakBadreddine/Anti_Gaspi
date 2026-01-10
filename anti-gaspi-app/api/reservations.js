@@ -20,6 +20,15 @@ export const getUserReservations = async () => {
 };
 
 /**
+ * Get complete reservation history (all statuses)
+ * @returns {Promise} API response with history array
+ */
+export const getReservationHistory = async () => {
+    const response = await apiClient.get('/reservations/history');
+    return response.data;
+};
+
+/**
  * Get merchant's reservations (merchant only)
  * @returns {Promise} API response with reservations array
  */

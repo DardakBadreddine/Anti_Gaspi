@@ -19,6 +19,17 @@ export const requestLocationPermission = async () => {
  * @returns {Promise<Object>} Location object with latitude and longitude
  */
 export const getCurrentLocation = async () => {
+    // 🧪 TEST MODE: Set to true to use fixed Paris coordinates for testing
+    const TEST_MODE = true;
+
+    if (TEST_MODE) {
+        console.log('🧪 TEST MODE: Using fixed Paris coordinates');
+        return {
+            latitude: 48.8566,
+            longitude: 2.3522,
+        };
+    }
+
     try {
         const hasPermission = await requestLocationPermission();
 

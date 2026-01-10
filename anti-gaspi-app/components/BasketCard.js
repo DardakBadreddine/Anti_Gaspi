@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CountdownTimer from './CountdownTimer';
+import FavoriteButton from './FavoriteButton';
+import StarRating from './StarRating';
 import { formatDistance } from '../utils/distance';
 
 const FOOD_IMAGES = [
@@ -11,6 +13,8 @@ const FOOD_IMAGES = [
     'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&q=80', // Pastry
     'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=800&q=80', // Sandwich
     'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80', // Salad
+    'https://images.unsplash.com/photo-1601599561213-832382fd07ba?w=800&q=80', // Supermarket
+    'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80', // Grocery store
 ];
 
 const BasketCard = ({ basket, onPress }) => {
@@ -18,8 +22,8 @@ const BasketCard = ({ basket, onPress }) => {
         ((basket.original_price - basket.discounted_price) / basket.original_price) * 100
     );
 
-    // Pick a deterministic random image based on ID
-    const imageUri = FOOD_IMAGES[basket.id % FOOD_IMAGES.length];
+    // Use selected image if available, otherwise fall back to deterministic random
+    const imageUri = basket.image_url || FOOD_IMAGES[basket.id % FOOD_IMAGES.length];
 
     return (
         <TouchableOpacity
@@ -42,10 +46,12 @@ const BasketCard = ({ basket, onPress }) => {
                     </View>
                 )}
 
-                {/* Favorite Icon (Visual only for now) */}
-                <View style={styles.favoriteButton}>
-                    <Ionicons name="heart-outline" size={20} color="#fff" />
-                </View>
+                {/* Favorite Button */}
+                {basket.merchant_id && (
+                    <View style={styles.favoriteButtonContainer}>
+                        <FavoriteButton merchantId={basket.merchant_id} size={20} />
+                    </View>
+                )}
 
                 {/* Timer Badge positioned on image */}
                 <View style={styles.timerBadge}>
@@ -61,6 +67,12 @@ const BasketCard = ({ basket, onPress }) => {
                         <Text style={styles.merchant}>
                             {basket.business_name} • {basket.distance ? formatDistance(basket.distance) : 'À proximité'}
                         </Text>
+                        {basket.merchant_rating > 0 && (
+                            <View style={styles.ratingRow}>
+                                <StarRating rating={basket.merchant_rating} size={12} />
+                                <Text style={styles.ratingText}>({basket.review_count})</Text>
+                            </View>
+                        )}
                     </View>
 
                     {/* Merchant Avatar (Placeholder) */}
@@ -129,16 +141,10 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
     },
-    favoriteButton: {
+    favoriteButtonContainer: {
         position: 'absolute',
         top: 12,
         right: 12,
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(0,0,0,0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     timerBadge: {
         position: 'absolute',
@@ -173,6 +179,16 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#6b7280',
         fontWeight: '500',
+    },
+    ratingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 4,
+    },
+    ratingText: {
+        fontSize: 11,
+        color: '#9ca3af',
     },
     avatar: {
         width: 40,

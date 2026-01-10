@@ -6,6 +6,9 @@ const { initializeDatabase } = require('./database/init');
 const createAuthRoutes = require('./routes/auth');
 const { createBasketRoutes, startBasketCleanup } = require('./routes/baskets');
 const createReservationRoutes = require('./routes/reservations');
+const createFavoritesRoutes = require('./routes/favorites');
+const createReviewsRoutes = require('./routes/reviews');
+const createStatsRoutes = require('./routes/stats');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +33,9 @@ const db = initializeDatabase(dbPath);
 app.use('/api/auth', createAuthRoutes(db));
 app.use('/api/baskets', createBasketRoutes(db));
 app.use('/api/reservations', createReservationRoutes(db));
+app.use('/api/favorites', createFavoritesRoutes(db));
+app.use('/api/reviews', createReviewsRoutes(db));
+app.use('/api/stats', createStatsRoutes(db));
 
 // Health check
 app.get('/health', (req, res) => {

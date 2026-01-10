@@ -15,7 +15,9 @@ import { getBasketDetails } from '../../api/baskets';
 import { createReservation } from '../../api/reservations';
 import CountdownTimer from '../../components/CountdownTimer';
 import Button from '../../components/Button';
+import FavoriteButton from '../../components/FavoriteButton';
 import { formatDistance } from '../../utils/distance';
+import DeliveryOptionsModal from '../../components/DeliveryOptionsModal';
 
 const FOOD_IMAGES = [
     'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80',
@@ -32,6 +34,7 @@ const BasketDetailsScreen = ({ route, navigation }) => {
     const [basket, setBasket] = useState(null);
     const [loading, setLoading] = useState(true);
     const [reserving, setReserving] = useState(false);
+    const [showDeliveryModal, setShowDeliveryModal] = useState(false);
 
     useEffect(() => {
         loadBasketDetails();
@@ -48,39 +51,31 @@ const BasketDetailsScreen = ({ route, navigation }) => {
         setLoading(false);
     };
 
-    const handleReserve = async () => {
-        Alert.alert(
-            'Confirmer la réservation',
-            'Vous aurez 1 heure pour récupérer ce panier. Le paiement se fait sur place.',
-            [
-                { text: 'Annuler', style: 'cancel' },
-                {
-                    text: 'Réserver',
-                    onPress: async () => {
-                        setReserving(true);
-                        try {
-                            await createReservation(basketId);
-                            Alert.alert(
-                                'Félicitations ! 🎉',
-                                'Votre panier est réservé. Retrouvez votre QR Code dans l\'onglet Réservations.',
-                                [
-                                    {
-                                        text: 'Voir mon QR Code',
-                                        // FIX: Navigate to nested screen
-                                        onPress: () => navigation.navigate('CustomerHome', { screen: 'Reservations' }),
-                                    },
-                                ]
-                            );
-                        } catch (error) {
-                            const errorMsg =
-                                error.response?.data?.error || 'Erreur lors de la réservation';
-                            Alert.alert('Oups', errorMsg);
-                        }
-                        setReserving(false);
+    const handleReserve = () => {
+        setShowDeliveryModal(true);
+    };
+
+    const handleDeliverySelect = async (deliveryOption) => {
+        setReserving(true);
+        try {
+            await createReservation(basketId, deliveryOption.value);
+            const totalPrice = basket.discounted_price + deliveryOption.fee;
+
+            Alert.alert(
+                'Félicitations ! 🎉',
+                `Panier réservé avec ${deliveryOption.label}.\nTotal: €${totalPrice.toFixed(2)}\n\nRetrouvez votre QR Code dans l'onglet Réservations.`,
+                [
+                    {
+                        text: 'Voir mon QR Code',
+                        onPress: () => navigation.navigate('CustomerHome', { screen: 'Reservations' }),
                     },
-                },
-            ]
-        );
+                ]
+            );
+        } catch (error) {
+            const errorMsg = error.response?.data?.error || 'Erreur lors de la réservation';
+            Alert.alert('Oups', errorMsg);
+        }
+        setReserving(false);
     };
 
     if (loading || !basket) {
@@ -94,12 +89,13 @@ const BasketDetailsScreen = ({ route, navigation }) => {
     const discount = Math.round(
         ((basket.original_price - basket.discounted_price) / basket.original_price) * 100
     );
-    const imageUri = FOOD_IMAGES[basketId % FOOD_IMAGES.length];
+    // Use selected image if available, otherwise fall back to deterministic random
+    const imageUri = basket.image_url || FOOD_IMAGES[basket.id % FOOD_IMAGES.length];
 
     return (
         <View style={styles.container}>
             <ScrollView
-                contentContainerStyle={{ paddingBottom: 100 }}
+                contentContainerStyle={{ paddingBottom: 100 + Math.max(insets.bottom, 10) }}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Hero Image */}
@@ -109,7 +105,9 @@ const BasketDetailsScreen = ({ route, navigation }) => {
 
                     {/* Header Actions */}
                     <View style={[styles.headerActions, { top: insets.top + 10 }]}>
-                        {/* Back button is handled by Stack Header usually, but if we wanted custom transparent header... */}
+                        {basket.merchant_id && (
+                            <FavoriteButton merchantId={basket.merchant_id} />
+                        )}
                     </View>
 
                     <View style={styles.timerBadge}>
@@ -184,6 +182,13 @@ const BasketDetailsScreen = ({ route, navigation }) => {
                     textStyle={{ fontSize: 18, fontWeight: '700' }}
                 />
             </View>
+
+            <DeliveryOptionsModal
+                visible={showDeliveryModal}
+                onClose={() => setShowDeliveryModal(false)}
+                onSelect={handleDeliverySelect}
+                basketPrice={basket.discounted_price}
+            />
         </View>
     );
 };
@@ -210,6 +215,12 @@ const styles = StyleSheet.create({
     imageOverlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.1)',
+    },
+    headerActions: {
+        position: 'absolute',
+        right: 20,
+        flexDirection: 'row',
+        gap: 12,
     },
     timerBadge: {
         position: 'absolute',

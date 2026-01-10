@@ -57,14 +57,14 @@ async function seed() {
         tomorrow.setDate(tomorrow.getDate() + 1);
 
         db.prepare(`
-            INSERT INTO baskets (merchant_id, title, description, original_price, discounted_price, quantity, expires_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(merchantId, 'Panier Surprise Matin', 'Viennoiseries de la veille', 12.00, 4.00, 5, tomorrow.toISOString());
+            INSERT INTO baskets (merchant_id, title, description, original_price, discounted_price, quantity, image_url, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(merchantId, 'Panier Surprise Matin', 'Viennoiseries de la veille', 12.00, 4.00, 5, 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&q=80', tomorrow.toISOString());
 
         db.prepare(`
-            INSERT INTO baskets (merchant_id, title, description, original_price, discounted_price, quantity, expires_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(merchantId, 'Panier Pain', 'Pains divers', 8.00, 2.50, 3, tomorrow.toISOString());
+            INSERT INTO baskets (merchant_id, title, description, original_price, discounted_price, quantity, image_url, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(merchantId, 'Panier Pain', 'Pains divers', 8.00, 2.50, 3, 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80', tomorrow.toISOString());
     }
 
     console.log('✅ Seeding complete!');

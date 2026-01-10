@@ -1,16 +1,16 @@
 import apiClient from './client';
 
 /**
- * Search baskets by location and radius
+ * Search baskets by location and radius with optional filters
  * @param {number} lat - User latitude
  * @param {number} lng - User longitude
  * @param {number} radius - Search radius in km (default: 5)
+ * @param {Object} filters - Optional filters {category, minPrice, maxPrice, sortBy}
  * @returns {Promise} API response with baskets array
  */
-export const searchBaskets = async (lat, lng, radius = 5) => {
-    const response = await apiClient.get('/baskets', {
-        params: { lat, lng, radius },
-    });
+export const searchBaskets = async (lat, lng, radius = 5, filters = {}) => {
+    const params = { lat, lng, radius, ...filters };
+    const response = await apiClient.get('/baskets', { params });
     return response.data;
 };
 
@@ -30,7 +30,9 @@ export const getBasketDetails = async (basketId) => {
  * @returns {Promise} API response
  */
 export const createBasket = async (basketData) => {
+    console.log('📤 Sending basket data:', basketData);
     const response = await apiClient.post('/baskets', basketData);
+    console.log('📥 Received response:', response.data);
     return response.data;
 };
 

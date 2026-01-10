@@ -116,6 +116,43 @@ function createReservationRoutes(db) {
     });
 
     /**
+     * GET /api/reservations/history
+     * Get complete reservation history (all statuses)
+     */
+    router.get('/history', authenticate, requireCustomer, (req, res) => {
+        try {
+            const history = db.prepare(`
+        SELECT 
+          r.*,
+          b.title,
+          b.description,
+          b.original_price,
+          b.discounted_price,
+          b.image_url,
+          m.id as merchant_id,
+          m.business_name,
+          u.address,
+          CASE 
+            WHEN rv.id IS NOT NULL THEN 1
+            ELSE 0
+          END as has_review
+        FROM reservations r
+        JOIN baskets b ON r.basket_id = b.id
+        JOIN merchants m ON b.merchant_id = m.id
+        JOIN users u ON m.user_id = u.id
+        LEFT JOIN reviews rv ON r.id = rv.reservation_id
+        WHERE r.user_id = ?
+        ORDER BY r.reserved_at DESC
+      `).all(req.user.userId);
+
+            res.json({ history });
+        } catch (error) {
+            console.error('Get history error:', error);
+            res.status(500).json({ error: 'Erreur lors de la récupération de l\'historique' });
+        }
+    });
+
+    /**
      * GET /api/reservations/merchant
      * Get merchant's pending pickups
      */
@@ -194,10 +231,10 @@ function createReservationRoutes(db) {
             // Update reservation status
             const now = new Date().toISOString();
             db.prepare(`
-        UPDATE reservations 
-        SET status = 'collected', collected_at = ?
-        WHERE id = ?
-      `).run(now, reservation.id);
+                UPDATE reservations 
+                SET status = 'collected', collected_at = ?
+                WHERE id = ?
+            `).run(now, reservation.id);
 
             res.json({
                 message: 'Réservation validée avec succès',

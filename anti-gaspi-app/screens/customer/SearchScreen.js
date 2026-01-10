@@ -11,11 +11,13 @@ import {
     Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { searchBaskets } from '../../api/baskets';
 import { getCurrentLocation } from '../../utils/location';
 import BasketCard from '../../components/BasketCard';
 import Button from '../../components/Button';
 import ProfileHeaderButton from '../../components/ProfileHeaderButton';
+import FilterModal from '../../components/FilterModal';
 
 const RADIUS_OPTIONS = [2, 5, 10, 20, 30, 50, 100];
 
@@ -26,6 +28,8 @@ const SearchScreen = ({ navigation }) => {
     const [refreshing, setRefreshing] = useState(false);
     const [radius, setRadius] = useState(10); // Default 10km
     const [location, setLocation] = useState(null);
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({});
 
     useEffect(() => {
         loadBaskets();
@@ -37,7 +41,7 @@ const SearchScreen = ({ navigation }) => {
             const loc = await getCurrentLocation();
             setLocation(loc);
 
-            const result = await searchBaskets(loc.latitude, loc.longitude, radius);
+            const result = await searchBaskets(loc.latitude, loc.longitude, radius, filters);
             setBaskets(result.baskets || []);
         } catch (error) {
             // Only show alert if it's not a background refresh
@@ -75,7 +79,18 @@ const SearchScreen = ({ navigation }) => {
                         <Text style={styles.title}>Découvrir</Text>
                         <Text style={styles.subtitle}>Sauvez des paniers autour de vous</Text>
                     </View>
-                    <ProfileHeaderButton />
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity
+                            style={styles.filterButton}
+                            onPress={() => setShowFilters(true)}
+                        >
+                            <Ionicons name="options-outline" size={24} color="#000" />
+                            {(filters.category || filters.minPrice || filters.maxPrice || filters.sortBy !== 'distance') && (
+                                <View style={styles.filterBadge} />
+                            )}
+                        </TouchableOpacity>
+                        <ProfileHeaderButton />
+                    </View>
                 </View>
 
                 <View style={styles.radiusContainer}>
@@ -127,6 +142,16 @@ const SearchScreen = ({ navigation }) => {
                     )
                 }
             />
+
+            <FilterModal
+                visible={showFilters}
+                onClose={() => setShowFilters(false)}
+                onApply={(newFilters) => {
+                    setFilters(newFilters);
+                    loadBaskets();
+                }}
+                initialFilters={filters}
+            />
         </View>
     );
 };
@@ -154,6 +179,29 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 20,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    filterButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f2f2f7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+    },
+    filterBadge: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#22c55e',
     },
     title: {
         fontSize: 34,
