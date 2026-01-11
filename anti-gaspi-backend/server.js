@@ -15,7 +15,33 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+// CORS configuration - allow requests from Expo apps and production domains
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, Postman, etc.)
+        if (!origin) return callback(null, true);
+        
+        // In development, allow all origins
+        if (process.env.NODE_ENV !== 'production') {
+            return callback(null, true);
+        }
+        
+        // In production, allow specific origins
+        const allowedOrigins = [
+            'https://exp.host',
+            'https://expo.dev',
+            process.env.ALLOWED_ORIGIN // Add custom domain if needed
+        ].filter(Boolean);
+        
+        if (allowedOrigins.some(allowed => origin.includes(allowed))) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+};
+app.use(cors(corsOptions));
 // Increase body size limit to 20MB for image uploads (base64 can be large)
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
