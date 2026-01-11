@@ -67,21 +67,12 @@ npm install
 
 ## 📋 Configuration Après Clonage
 
-### 1. Configuration de l'API (IMPORTANT)
+### 1. Configuration Automatique de l'API
 
-Avant de lancer l'application mobile, vous devez configurer l'adresse IP du serveur backend :
+**✅ Aucune configuration manuelle nécessaire !** L'application détecte automatiquement l'adresse IP du serveur backend grâce à Expo.
 
-1. **Trouver votre adresse IP locale** :
-   - **Windows** : Ouvrez Command Prompt et tapez `ipconfig`
-   - **Mac/Linux** : Ouvrez Terminal et tapez `ifconfig`
-   - Cherchez "IPv4 Address" (ex: `192.168.1.100`)
-
-2. **Modifier le fichier de configuration** :
-   - Ouvrez `anti-gaspi-app/api/client.js`
-   - À la ligne 7, remplacez `192.168.1.100` par votre adresse IP :
-   ```javascript
-   const API_BASE_URL = 'http://VOTRE_IP_ICI:3000/api';
-   ```
+- **En développement** : L'app détecte automatiquement l'IP du serveur Expo et l'utilise pour se connecter au backend
+- **En production** : Configurez la variable d'environnement `EXPO_PUBLIC_API_URL` dans votre fichier `.env` (optionnel)
 
 ### 2. Initialisation de la Base de Données
 
@@ -131,6 +122,7 @@ Un QR code apparaîtra dans le terminal.
 **⚠️ Important** :
 - Votre téléphone et votre ordinateur doivent être sur le **même réseau Wi-Fi**
 - Les deux terminaux (backend et mobile) doivent rester ouverts
+- L'URL de l'API est détectée automatiquement - aucune configuration manuelle nécessaire !
 
 ## ✨ Liste Complète des Fonctionnalités
 
@@ -466,7 +458,7 @@ Anti_Gaspi/
 
 ### Configuration Réseau
 - **Même réseau Wi-Fi** : Votre téléphone et votre ordinateur doivent être sur le même réseau Wi-Fi
-- **Configuration IP** : Modifiez l'adresse IP dans `anti-gaspi-app/api/client.js` avant de lancer l'application mobile
+- **Détection automatique** : L'application détecte automatiquement l'adresse IP du serveur - aucune configuration manuelle nécessaire
 - **Pare-feu** : Assurez-vous que le port 3000 n'est pas bloqué par votre pare-feu
 
 ### Utilisation
@@ -475,19 +467,44 @@ Anti_Gaspi/
 - **Base de données** : La base de données SQLite est créée automatiquement au premier lancement
 
 ### Dépannage
-- **Erreur de connexion** : Vérifiez que le backend tourne et que l'IP est correcte
+- **Erreur de connexion** : 
+  - Vérifiez que le backend tourne sur le port 3000
+  - Assurez-vous que votre téléphone et votre ordinateur sont sur le même réseau Wi-Fi
+  - Vérifiez les logs de l'app pour voir l'URL de l'API détectée
 - **Port déjà utilisé** : Si le port 3000 est occupé, modifiez `PORT` dans `anti-gaspi-backend/server.js`
 - **Erreur bcrypt** : Sur Windows, les erreurs bcrypt sont normales et n'empêchent pas le fonctionnement
+- **Détection IP échoue** : Si l'auto-détection ne fonctionne pas, vous pouvez définir `EXPO_PUBLIC_API_URL` dans un fichier `.env`
 
 ## 🔮 Améliorations Futures
 
-- Backend push notifications (alertes nouveaux paniers)
-- Upload d'images pour les paniers  
-- Système de notes/avis
-- Paiement in-app (Stripe)
-- Chat commerçant-client
-- Dashboard analytics
-- Migration PostgreSQL pour production
+Une liste complète et détaillée des fonctionnalités à ajouter est disponible dans [FEATURES_TO_ADD.md](FEATURES_TO_ADD.md).
+
+### Fonctionnalités Prioritaires
+
+**Priorité Haute** (Impact Immédiat):
+- 📸 **Upload d'Images** - Photos réelles des paniers
+- ⭐ **Système de Notes et Avis** - Évaluation des commerces
+- 🔔 **Notifications Push Complètes** - Toutes les alertes activées
+- 🏷️ **Catégories et Tags** - Organisation des paniers
+- 🔍 **Recherche Avancée** - Filtres et tri améliorés
+
+**Priorité Moyenne** (Amélioration UX):
+- 💳 **Paiement In-App** - Transactions intégrées (Stripe)
+- 📱 **Historique des Commandes** - Suivi des réservations passées
+- 🎯 **Points de Fidélité** - Gamification et récompenses
+- 🥗 **Informations Diététiques** - Allergènes et régimes spéciaux
+- 📊 **Tableau de Bord Analytics** - Statistiques pour commerçants
+- 💬 **Chat/Messaging** - Communication commerçant-client
+
+**Priorité Basse** (Nice to Have):
+- 📅 Réservations programmées
+- 🔗 Partage social
+- 🎁 Système de parrainage
+- 📈 Alertes de prix personnalisées
+- 🌍 Mode multilingue
+- 📊 Statistiques environnementales
+
+Voir [FEATURES_TO_ADD.md](FEATURES_TO_ADD.md) pour la liste complète avec détails d'implémentation.
 
 ---
 

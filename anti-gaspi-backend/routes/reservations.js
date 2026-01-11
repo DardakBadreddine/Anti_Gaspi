@@ -92,6 +92,49 @@ function createReservationRoutes(db) {
                 };
             })();
 
+            // Send notification to merchant
+            (async () => {
+                try {
+                    const merchant = db.prepare(`
+                        SELECT m.id, m.business_name, u.id as user_id
+                        FROM baskets b
+                        JOIN merchants m ON b.merchant_id = m.id
+                        JOIN users u ON m.user_id = u.id
+                        WHERE b.id = ?
+                    `).get(basketId);
+
+                    if (merchant) {
+                        const tokens = db.prepare(`
+                            SELECT token FROM push_tokens
+                            WHERE user_id = ?
+                        `).all(merchant.user_id);
+
+                        if (tokens.length > 0) {
+                            const fetch = require('node-fetch');
+                            const messages = tokens.map(t => ({
+                                to: t.token,
+                                sound: 'default',
+                                title: 'Nouvelle Réservation ! 📦',
+                                body: `Un client a réservé un panier`,
+                                data: { basketId, reservationId: reservation.id, type: 'new_reservation' },
+                            }));
+
+                            await fetch('https://exp.host/--/api/v2/push/send', {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Accept-encoding': 'gzip, deflate',
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify(messages),
+                            });
+                        }
+                    }
+                } catch (notifError) {
+                    console.error('Notification error:', notifError);
+                }
+            })();
+
             res.status(201).json({
                 message: 'Réservation créée avec succès',
                 reservation
@@ -125,6 +168,7 @@ function createReservationRoutes(db) {
           b.original_price,
           b.discounted_price,
           b.expires_at,
+          b.merchant_id,
           m.business_name,
           u.address,
           u.latitude,
@@ -244,6 +288,39 @@ function createReservationRoutes(db) {
                     status: 'collected',
                     collected_at: now
                 };
+            })();
+
+            // Send notification to customer
+            (async () => {
+                try {
+                    const tokens = db.prepare(`
+                        SELECT token FROM push_tokens
+                        WHERE user_id = ?
+                    `).all(reservation.user_id);
+
+                    if (tokens.length > 0) {
+                        const fetch = require('node-fetch');
+                        const messages = tokens.map(t => ({
+                            to: t.token,
+                            sound: 'default',
+                            title: 'Réservation Validée ! ✅',
+                            body: `Votre panier a été récupéré avec succès`,
+                            data: { reservationId: reservation.id, type: 'reservation_validated' },
+                        }));
+
+                        await fetch('https://exp.host/--/api/v2/push/send', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Accept-encoding': 'gzip, deflate',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(messages),
+                        });
+                    }
+                } catch (notifError) {
+                    console.error('Notification error:', notifError);
+                }
             })();
 
             res.json({

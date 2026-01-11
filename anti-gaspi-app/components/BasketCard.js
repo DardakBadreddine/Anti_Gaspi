@@ -18,8 +18,10 @@ const BasketCard = ({ basket, onPress, showMerchantInfo = true }) => {
         ((basket.original_price - basket.discounted_price) / basket.original_price) * 100
     );
 
-    // Pick a deterministic random image based on ID
-    const imageUri = FOOD_IMAGES[basket.id % FOOD_IMAGES.length];
+    // Use uploaded image if available (supports both data URI and regular URL), otherwise fallback to placeholder
+    const imageUri = basket.image_url 
+        ? (basket.image_url.startsWith('data:') ? basket.image_url : basket.image_url)
+        : FOOD_IMAGES[basket.id % FOOD_IMAGES.length];
 
     return (
         <TouchableOpacity
@@ -60,13 +62,46 @@ const BasketCard = ({ basket, onPress, showMerchantInfo = true }) => {
                         )}
                     </View>
 
-                    {/* Merchant Avatar (Placeholder) */}
+                    {/* Merchant Avatar/Logo */}
                     {showMerchantInfo && (
                         <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>{basket.business_name?.substring(0, 1) || 'M'}</Text>
+                            {basket.merchant_logo_url ? (
+                                <Image 
+                                    source={{ uri: basket.merchant_logo_url }} 
+                                    style={styles.avatarImage}
+                                    resizeMode="cover"
+                                />
+                            ) : (
+                                <Text style={styles.avatarText}>{basket.business_name?.substring(0, 1) || 'M'}</Text>
+                            )}
                         </View>
                     )}
                 </View>
+
+                {/* Categories */}
+                {basket.categories && basket.categories.length > 0 && (
+                    <View style={styles.categoriesRow}>
+                        {basket.categories.slice(0, 3).map((category) => (
+                            <View key={category.id} style={styles.categoryBadge}>
+                                <Text style={styles.categoryIcon}>{category.icon}</Text>
+                                <Text style={styles.categoryName}>{category.name}</Text>
+                            </View>
+                        ))}
+                        {basket.categories.length > 3 && (
+                            <Text style={styles.moreCategories}>+{basket.categories.length - 3}</Text>
+                        )}
+                    </View>
+                )}
+
+                {/* Rating */}
+                {basket.rating && basket.rating > 0 && (
+                    <View style={styles.ratingRow}>
+                        <Ionicons name="star" size={14} color="#fbbf24" />
+                        <Text style={styles.ratingText}>
+                            {Number(basket.rating).toFixed(1)}
+                        </Text>
+                    </View>
+                )}
 
                 {/* Price Row */}
                 <View style={styles.footerRow}>
@@ -182,6 +217,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: '#e5e7eb',
+        overflow: 'hidden',
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
     },
     avatarText: {
         fontSize: 18,
@@ -223,6 +263,46 @@ const styles = StyleSheet.create({
         color: '#16a34a',
         fontSize: 14,
         fontWeight: '700',
+    },
+    categoriesRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 8,
+    },
+    categoryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f3f4f6',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    categoryIcon: {
+        fontSize: 12,
+        marginRight: 4,
+    },
+    categoryName: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#6b7280',
+    },
+    ratingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        gap: 4,
+    },
+    ratingText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    moreCategories: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#9ca3af',
+        alignSelf: 'center',
     },
 });
 

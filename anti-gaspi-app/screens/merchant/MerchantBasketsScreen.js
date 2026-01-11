@@ -7,16 +7,19 @@ import {
     RefreshControl,
     Alert,
     TouchableOpacity,
+    Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../../contexts/AuthContext';
 import { getMerchantBaskets, deleteBasket } from '../../api/baskets';
 import CountdownTimer from '../../components/CountdownTimer';
 import Button from '../../components/Button';
 
 const MerchantBasketsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
+    const { user } = useAuth();
     const [baskets, setBaskets] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -109,7 +112,32 @@ const MerchantBasketsScreen = ({ navigation }) => {
     return (
         <View style={styles.container}>
             <View style={[styles.headerContainer, { paddingTop: insets.top + 16 }]}>
-                <Text style={styles.headerTitle}>Mes Paniers</Text>
+                {/* Cover Image */}
+                {user?.cover_image_url ? (
+                    <Image 
+                        source={{ uri: user.cover_image_url }} 
+                        style={styles.coverImage}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <View style={styles.coverImagePlaceholder} />
+                )}
+                
+                {/* Logo/Avatar */}
+                <View style={styles.logoContainer}>
+                    {user?.logo_url ? (
+                        <Image 
+                            source={{ uri: user.logo_url }} 
+                            style={styles.logo}
+                        />
+                    ) : (
+                        <View style={styles.logoPlaceholder}>
+                            <Ionicons name="storefront" size={32} color="#22c55e" />
+                        </View>
+                    )}
+                </View>
+                
+                <Text style={styles.headerTitle}>{user?.business_name || 'Mes Paniers'}</Text>
                 <Text style={styles.headerSubtitle}>
                     {baskets.length} panier{baskets.length !== 1 ? 's' : ''} actif{baskets.length !== 1 ? 's' : ''}
                 </Text>
@@ -169,6 +197,47 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
         elevation: 5,
         zIndex: 10,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    coverImage: {
+        width: '100%',
+        height: 120,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+    },
+    coverImagePlaceholder: {
+        width: '100%',
+        height: 120,
+        backgroundColor: '#f0fdf4',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+    },
+    logoContainer: {
+        alignItems: 'center',
+        marginTop: 60,
+        marginBottom: 12,
+    },
+    logo: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        borderWidth: 4,
+        borderColor: '#fff',
+    },
+    logoPlaceholder: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#f0fdf4',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 4,
+        borderColor: '#fff',
     },
     headerTitle: {
         fontSize: 34,

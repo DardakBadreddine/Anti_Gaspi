@@ -29,10 +29,9 @@ npx expo start --clear
 
 ## ⚠️ IMPORTANT
 
-**Avant de lancer le mobile, change l'IP:**
-- Fichier: `anti-gaspi-mobile/api/client.js` ligne 7
-- Trouve ton IP: `ipconfig` dans Command Prompt
-- Change `192.168.1.100` par TON IP
+**✅ Aucune configuration IP nécessaire !**
+- L'application détecte automatiquement l'adresse IP du serveur
+- Assurez-vous que votre téléphone et votre ordinateur sont sur le même réseau Wi-Fi
 
 ---
 

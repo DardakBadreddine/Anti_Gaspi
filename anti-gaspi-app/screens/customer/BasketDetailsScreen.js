@@ -93,7 +93,10 @@ const BasketDetailsScreen = ({ route, navigation }) => {
     const discount = Math.round(
         ((basket.original_price - basket.discounted_price) / basket.original_price) * 100
     );
-    const imageUri = FOOD_IMAGES[basketId % FOOD_IMAGES.length];
+    // Use uploaded image if available, otherwise fallback to placeholder
+    const imageUri = basket?.image_url 
+        ? (basket.image_url.startsWith('data:') ? basket.image_url : basket.image_url)
+        : FOOD_IMAGES[basketId % FOOD_IMAGES.length];
 
     return (
         <View style={styles.container}>
@@ -121,6 +124,14 @@ const BasketDetailsScreen = ({ route, navigation }) => {
                     <View style={styles.header}>
                         <View style={styles.titleRow}>
                             <Text style={styles.title}>{basket.title}</Text>
+                            {basket.rating && basket.rating > 0 && (
+                                <View style={styles.ratingContainer}>
+                                    <Ionicons name="star" size={16} color="#fbbf24" />
+                                    <Text style={styles.ratingText}>
+                                        {basket.rating.toFixed(1)}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                         <Text style={styles.merchant}>
                             {basket.business_name} • {basket.distance ? formatDistance(basket.distance) : 'À proximité'}
@@ -247,6 +258,20 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '500',
         color: '#6b7280',
+    },
+    ratingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#fef3c7',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    ratingText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#92400e',
     },
     divider: {
         height: 1,

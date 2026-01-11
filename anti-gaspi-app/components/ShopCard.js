@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const ShopCard = ({ shop, onPress, onFavoriteToggle }) => {
@@ -7,6 +7,7 @@ const ShopCard = ({ shop, onPress, onFavoriteToggle }) => {
         id,
         business_name,
         logo_url,
+        cover_image_url,
         distance,
         rating,
         tagline,
@@ -18,6 +19,33 @@ const ShopCard = ({ shop, onPress, onFavoriteToggle }) => {
     const soonestExpiry = paniers && paniers.length > 0
         ? new Date(paniers[0].expires_at)
         : null;
+
+    // Get primary category from baskets to determine shop type
+    const getPrimaryCategory = () => {
+        if (!paniers || paniers.length === 0) return null;
+        // Get the first category from the first basket
+        const firstBasket = paniers[0];
+        if (firstBasket.categories && firstBasket.categories.length > 0) {
+            return firstBasket.categories[0];
+        }
+        return null;
+    };
+
+    const primaryCategory = getPrimaryCategory();
+
+    // Get shop image - use cover_image_url if available, otherwise use logo_url, otherwise null
+    const getShopImage = () => {
+        if (cover_image_url) {
+            return { uri: cover_image_url };
+        }
+        if (logo_url) {
+            return { uri: logo_url };
+        }
+        // Return null to use the default placeholder
+        return null;
+    };
+
+    const shopImage = getShopImage();
 
     const getTimeRemaining = () => {
         if (!soonestExpiry) return null;
@@ -38,10 +66,37 @@ const ShopCard = ({ shop, onPress, onFavoriteToggle }) => {
 
     return (
         <TouchableOpacity style={styles.card} onPress={() => onPress(shop)} activeOpacity={0.7}>
+            {/* Shop Image */}
+            {shopImage ? (
+                <Image 
+                    source={shopImage} 
+                    style={styles.shopImage}
+                    resizeMode="cover"
+                />
+            ) : (
+                <View style={styles.shopImagePlaceholder}>
+                    <Ionicons name="storefront" size={48} color="#22c55e" />
+                </View>
+            )}
+            
             <View style={styles.header}>
                 {/* Logo/Avatar */}
                 <View style={styles.avatar}>
-                    <Ionicons name="storefront" size={32} color="#22c55e" />
+                    {logo_url ? (
+                        <Image 
+                            source={{ uri: logo_url }} 
+                            style={styles.avatarImage}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View style={[
+                            { backgroundColor: (primaryCategory?.color || '#22c55e') + '20' }
+                        ]}>
+                            <Text style={styles.avatarIcon}>
+                                {primaryCategory?.icon || '🏪'}
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Shop Info */}
@@ -77,11 +132,16 @@ const ShopCard = ({ shop, onPress, onFavoriteToggle }) => {
                     }}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                    <Ionicons
-                        name={is_favorited ? 'heart' : 'heart-outline'}
-                        size={24}
-                        color={is_favorited ? '#ef4444' : '#8E8E93'}
-                    />
+                    <View style={[
+                        styles.favoriteButtonBackground,
+                        is_favorited && styles.favoriteButtonBackgroundActive
+                    ]}>
+                        <Ionicons
+                            name={is_favorited ? 'heart' : 'heart-outline'}
+                            size={20}
+                            color={is_favorited ? '#ef4444' : '#8E8E93'}
+                        />
+                    </View>
                 </TouchableOpacity>
             </View>
 
@@ -109,7 +169,7 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: '#fff',
         borderRadius: 16,
-        padding: 16,
+        overflow: 'hidden',
         marginBottom: 12,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -117,10 +177,27 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 2,
     },
+    shopImage: {
+        width: '100%',
+        height: 140,
+        backgroundColor: '#F2F2F7',
+    },
+    shopImagePlaceholder: {
+        width: '100%',
+        height: 140,
+        backgroundColor: '#f0fdf4',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    shopImageIcon: {
+        fontSize: 64,
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         marginBottom: 12,
+        paddingHorizontal: 16,
+        paddingTop: 16,
     },
     avatar: {
         width: 56,
@@ -130,6 +207,16 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
+        borderWidth: 2,
+        borderColor: '#F2F2F7',
+        overflow: 'hidden',
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    avatarIcon: {
+        fontSize: 28,
     },
     info: {
         flex: 1,
@@ -174,10 +261,23 @@ const styles = StyleSheet.create({
     favoriteButton: {
         padding: 8,
     },
+    favoriteButtonBackground: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F2F2F7',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    favoriteButtonBackgroundActive: {
+        backgroundColor: '#fee2e2',
+    },
     summary: {
         borderTopWidth: 1,
         borderTopColor: '#F2F2F7',
         paddingTop: 12,
+        paddingHorizontal: 16,
+        paddingBottom: 16,
         gap: 8,
     },
     summaryItem: {

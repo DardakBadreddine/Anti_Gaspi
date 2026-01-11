@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { cancelReservation } from '../../api/reservations';
+import { cancelReservation, getUserReservations } from '../../api/reservations';
+import { getBasketDetails } from '../../api/baskets';
 import Button from '../../components/Button';
 import CountdownTimer from '../../components/CountdownTimer';
 
@@ -24,6 +25,33 @@ const ReservationDetailScreen = ({ route, navigation }) => {
 
     // Initial state from params, but could be refreshed if needed
     const [item, setItem] = useState(reservation);
+
+    // Ensure merchant_id is available - if not, try to get it from basket or reload reservation
+    useEffect(() => {
+        const ensureMerchantId = async () => {
+            if (!item.merchant_id && item.basket_id) {
+                try {
+                    // Try to get merchant_id from basket details
+                    const basket = await getBasketDetails(item.basket_id);
+                    if (basket && basket.merchant_id) {
+                        setItem(prev => ({ ...prev, merchant_id: basket.merchant_id }));
+                        console.log('✅ merchant_id retrieved from basket:', basket.merchant_id);
+                    } else {
+                        // Fallback: reload all reservations to get updated data
+                        const result = await getUserReservations();
+                        const updatedReservation = result.reservations?.find(r => r.id === item.id);
+                        if (updatedReservation && updatedReservation.merchant_id) {
+                            setItem(updatedReservation);
+                            console.log('✅ merchant_id retrieved from reloaded reservation:', updatedReservation.merchant_id);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching merchant_id:', error);
+                }
+            }
+        };
+        ensureMerchantId();
+    }, [item.id, item.basket_id]);
 
     const isPending = item.status === 'pending';
     const isExpired = new Date(item.expires_at) <= new Date();
@@ -197,6 +225,47 @@ const ReservationDetailScreen = ({ route, navigation }) => {
                         variant="outline" // Assuming an outline variant exists or style overrides
                     />
                 )}
+                {/* Review Button for Collected Reservations */}
+                {isCollected && (
+                    <View style={styles.reviewSection}>
+                        <Button
+                            title="Laisser un avis"
+                            onPress={async () => {
+                                // Extract merchant ID from reservation
+                                // Assuming we have merchant info in the reservation object
+                                // Ensure merchantId is available
+                                let merchantId = item.merchant_id || item.basket?.merchant_id;
+                                
+                                // If still not available, try to fetch it
+                                if (!merchantId && item.basket_id) {
+                                    try {
+                                        const basket = await getBasketDetails(item.basket_id);
+                                        merchantId = basket?.merchant_id;
+                                    } catch (error) {
+                                        console.error('Error fetching basket for merchant_id:', error);
+                                    }
+                                }
+                                
+                                if (!merchantId) {
+                                    Alert.alert(
+                                        'Erreur', 
+                                        'Impossible de récupérer l\'ID du commerçant. Veuillez réessayer plus tard ou recharger la page.'
+                                    );
+                                    return;
+                                }
+                                
+                                navigation.navigate('Review', {
+                                    merchantId: parseInt(merchantId, 10),
+                                    merchantName: item.business_name || 'Commerçant',
+                                    reservationId: parseInt(item.id, 10),
+                                    basketTitle: item.basket?.title || item.title,
+                                });
+                            }}
+                            style={styles.reviewButton}
+                        />
+                    </View>
+                )}
+
                 <View style={{ height: 40 }} />
             </ScrollView>
         </View>
@@ -394,6 +463,10 @@ const styles = StyleSheet.create({
         color: '#22c55e',
         fontWeight: '600',
         fontSize: 14,
+    },
+    reviewSection: {
+        marginTop: 20,
+        marginBottom: 10,
     },
     mapContainer: {
         height: 150,

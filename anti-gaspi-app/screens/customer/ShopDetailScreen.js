@@ -9,25 +9,71 @@ import {
     TouchableOpacity,
     Linking,
     Platform,
+    ActivityIndicator,
+    Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import PanierCard from '../../components/BasketCard';
 import Button from '../../components/Button';
 import { addFavorite, removeFavorite } from '../../api/favorites';
+import { getMerchantShop } from '../../api/baskets';
 
 const ShopDetailScreen = ({ route, navigation }) => {
     const { shopId, shop: initialShop } = route.params;
     const insets = useSafeAreaInsets();
     const [shop, setShop] = useState(initialShop);
     const [loading, setLoading] = useState(false);
+    const [loadingShop, setLoadingShop] = useState(false);
+
+    useEffect(() => {
+        // If shop data is incomplete (no paniers), load it from API
+        // Always load if we don't have paniers, or if is_favorited is undefined
+        if (shopId && (!shop?.paniers || shop.paniers.length === 0 || shop.is_favorited === undefined)) {
+            loadShopData();
+        }
+    }, [shopId]);
+
+    const loadShopData = async () => {
+        setLoadingShop(true);
+        try {
+            console.log('🛍️ Loading shop data for merchantId:', shopId);
+            const shopData = await getMerchantShop(shopId);
+            console.log('✅ Shop data loaded:', shopData);
+            // Preserve is_favorited from initialShop if it was explicitly set to true
+            // Otherwise use the value from API
+            const isFavorited = shop?.is_favorited === true ? true : (shopData.is_favorited || false);
+            setShop({
+                ...shop,
+                ...shopData,
+                id: shopData.id || shopId,
+                paniers: shopData.paniers || [],
+                is_favorited: isFavorited,
+                // Ensure all text values are strings
+                address: String(shopData.address || shop?.address || ''),
+                phone: String(shopData.phone || shop?.phone || ''),
+                tagline: String(shopData.tagline || shop?.tagline || ''),
+                business_name: String(shopData.business_name || shop?.business_name || 'Commerçant'),
+            });
+        } catch (error) {
+            console.error('Error loading shop data:', error);
+            Alert.alert('Erreur', 'Impossible de charger les informations du commerçant');
+        }
+        setLoadingShop(false);
+    };
 
     const handleFavoriteToggle = async () => {
         try {
-            if (shop.is_favorited) {
-                await removeFavorite(shop.id);
+            const merchantId = shop?.id || shopId;
+            if (!merchantId) {
+                Alert.alert('Erreur', 'ID commerçant introuvable');
+                return;
+            }
+
+            if (shop?.is_favorited) {
+                await removeFavorite(merchantId);
             } else {
-                await addFavorite(shop.id);
+                await addFavorite(merchantId);
             }
 
             setShop({ ...shop, is_favorited: !shop.is_favorited });
@@ -57,6 +103,30 @@ const ShopDetailScreen = ({ route, navigation }) => {
         navigation.navigate('BasketDetails', { basketId: panierId });
     };
 
+    if (loadingShop) {
+        return (
+            <View style={styles.container}>
+                <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <Ionicons name="arrow-back" size={24} color="#000" />
+                    </TouchableOpacity>
+                    <View style={styles.headerInfo}>
+                        <Text style={styles.headerTitle} numberOfLines={1}>
+                            {shop?.business_name || 'Chargement...'}
+                        </Text>
+                    </View>
+                </View>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#22c55e" />
+                    <Text style={styles.loadingText}>Chargement...</Text>
+                </View>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             {/* Header */}
@@ -70,7 +140,7 @@ const ShopDetailScreen = ({ route, navigation }) => {
 
                 <View style={styles.headerInfo}>
                     <Text style={styles.headerTitle} numberOfLines={1}>
-                        {shop.business_name}
+                        {shop?.business_name || 'Commerçant'}
                     </Text>
                 </View>
 
@@ -79,9 +149,9 @@ const ShopDetailScreen = ({ route, navigation }) => {
                     onPress={handleFavoriteToggle}
                 >
                     <Ionicons
-                        name={shop.is_favorited ? 'heart' : 'heart-outline'}
+                        name={shop?.is_favorited ? 'heart' : 'heart-outline'}
                         size={24}
-                        color={shop.is_favorited ? '#ef4444' : '#000'}
+                        color={shop?.is_favorited ? '#ef4444' : '#000'}
                     />
                 </TouchableOpacity>
             </View>
@@ -89,38 +159,60 @@ const ShopDetailScreen = ({ route, navigation }) => {
             <ScrollView
                 style={styles.content}
                 contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+                showsVerticalScrollIndicator={false}
             >
+                {/* Cover Image */}
+                {shop?.cover_image_url ? (
+                    <Image 
+                        source={{ uri: shop.cover_image_url }} 
+                        style={styles.coverImage}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <View style={styles.coverImagePlaceholder}>
+                        <Ionicons name="storefront" size={64} color="#22c55e" />
+                    </View>
+                )}
+
                 {/* Shop Info Card */}
                 <View style={styles.infoCard}>
-                    <View style={styles.avatar}>
-                        <Ionicons name="storefront" size={48} color="#22c55e" />
-                    </View>
+                    {/* Logo */}
+                    {shop?.logo_url ? (
+                        <Image 
+                            source={{ uri: shop.logo_url }} 
+                            style={styles.logo}
+                        />
+                    ) : (
+                        <View style={styles.avatar}>
+                            <Ionicons name="storefront" size={48} color="#22c55e" />
+                        </View>
+                    )}
 
                     <View style={styles.metaRow}>
-                        {shop.rating > 0 && (
+                        {shop?.rating > 0 && (
                             <View style={styles.metaItem}>
                                 <Ionicons name="star" size={16} color="#f59e0b" />
                                 <Text style={styles.metaText}>
-                                    {(shop.rating || 0).toFixed(1)} (12 avis)
+                                    {Number(shop.rating || 0).toFixed(1)} ({shop.review_count || 0} {shop.review_count === 1 ? 'avis' : 'avis'})
                                 </Text>
                             </View>
                         )}
                     </View>
 
-                    {shop.tagline && (
+                    {shop?.tagline && (
                         <Text style={styles.tagline}>"{shop.tagline}"</Text>
                     )}
 
-                    {shop.address && (
+                    {shop?.address && (
                         <View style={styles.addressRow}>
                             <Ionicons name="location" size={16} color="#8E8E93" />
                             <Text style={styles.addressText}>
-                                {(shop.distance || 0).toFixed(1)} km • {shop.address}
+                                {shop?.distance ? `${shop.distance.toFixed(1)} km • ` : ''}{shop?.address || ''}
                             </Text>
                         </View>
                     )}
 
-                    {shop.phone && (
+                    {shop?.phone && (
                         <View style={styles.addressRow}>
                             <Ionicons name="call" size={16} color="#8E8E93" />
                             <Text style={styles.addressText}>{shop.phone}</Text>
@@ -129,12 +221,14 @@ const ShopDetailScreen = ({ route, navigation }) => {
 
                     {/* Action Buttons */}
                     <View style={styles.actions}>
-                        <TouchableOpacity style={styles.actionButton} onPress={handleDirections}>
-                            <Ionicons name="navigate" size={20} color="#22c55e" />
-                            <Text style={styles.actionButtonText}>Itinéraire</Text>
-                        </TouchableOpacity>
+                        {shop?.latitude && shop?.longitude && (
+                            <TouchableOpacity style={styles.actionButton} onPress={handleDirections}>
+                                <Ionicons name="navigate" size={20} color="#22c55e" />
+                                <Text style={styles.actionButtonText}>Itinéraire</Text>
+                            </TouchableOpacity>
+                        )}
 
-                        {shop.phone && (
+                        {shop?.phone && (
                             <TouchableOpacity style={styles.actionButton} onPress={handleCall}>
                                 <Ionicons name="call" size={20} color="#22c55e" />
                                 <Text style={styles.actionButtonText}>Appeler</Text>
@@ -146,10 +240,10 @@ const ShopDetailScreen = ({ route, navigation }) => {
                 {/* Paniers Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>
-                        Paniers disponibles ({shop.paniers?.length || 0})
+                        Paniers disponibles ({shop?.paniers?.length || 0})
                     </Text>
 
-                    {shop.paniers && shop.paniers.length > 0 ? (
+                    {shop?.paniers && shop.paniers.length > 0 ? (
                         shop.paniers.map((panier) => (
                             <PanierCard
                                 key={panier.id}
@@ -208,11 +302,25 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
     },
+    coverImage: {
+        width: '100%',
+        height: 200,
+        backgroundColor: '#F2F2F7',
+    },
+    coverImagePlaceholder: {
+        width: '100%',
+        height: 200,
+        backgroundColor: '#f0fdf4',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     infoCard: {
         backgroundColor: '#fff',
         margin: 20,
+        marginTop: -60,
         marginBottom: 16,
         padding: 20,
+        paddingTop: 80,
         borderRadius: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -229,6 +337,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         alignSelf: 'center',
         marginBottom: 16,
+        borderWidth: 4,
+        borderColor: '#fff',
+    },
+    logo: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#fff',
+        alignSelf: 'center',
+        marginBottom: 16,
+        borderWidth: 4,
+        borderColor: '#fff',
     },
     metaRow: {
         flexDirection: 'row',
@@ -306,6 +426,17 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#8E8E93',
         marginTop: 12,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#8E8E93',
     },
 });
 

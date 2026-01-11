@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,8 +10,10 @@ import {
     TouchableOpacity,
     Modal,
     TextInput,
+    Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/Button';
@@ -38,26 +40,139 @@ const ProfileScreen = ({ navigation }) => {
         latitude: user?.latitude,
         longitude: user?.longitude
     });
+    
+    // Image states for merchants
+    const [coverImageBase64, setCoverImageBase64] = useState(user?.cover_image_url || null);
+    const [logoImageBase64, setLogoImageBase64] = useState(user?.logo_url || null);
+    
+    // Profile image for customers
+    const [profileImageBase64, setProfileImageBase64] = useState(user?.profile_image_url || null);
+
+    // Update form state when user changes (after profile update)
+    useEffect(() => {
+        if (user) {
+            console.log('📱 ProfileScreen: User updated', {
+                hasCoverImage: !!user.cover_image_url,
+                hasLogo: !!user.logo_url,
+                hasProfileImage: !!user.profile_image_url,
+                role: user.role
+            });
+            setName(user.name || '');
+            setEmail(user.email || '');
+            setPhone(user.phone || '');
+            setAddress(user.address || '');
+            setLocation({
+                latitude: user.latitude || null,
+                longitude: user.longitude || null
+            });
+        }
+    }, [user]);
 
     const handleSave = async () => {
         setLoading(true);
 
-        const result = await update({
+        const updateData = {
             name,
             email,
             phone,
             address,
             latitude: location?.latitude,
             longitude: location?.longitude,
-        });
+        };
+
+        // Add image data for merchants
+        if (user?.role === 'merchant') {
+            if (coverImageBase64 !== null) {
+                updateData.coverImageBase64 = coverImageBase64;
+            }
+            if (logoImageBase64 !== null) {
+                updateData.logoImageBase64 = logoImageBase64;
+            }
+        }
+        
+        // Add profile image for customers
+        if (user?.role === 'customer' && profileImageBase64 !== null) {
+            updateData.profileImageBase64 = profileImageBase64;
+        }
+
+        const result = await update(updateData);
 
         setLoading(false);
 
         if (result.success) {
+            // Reset image states after successful save so they use the URLs from user object
+            // The user object in context will be updated by AuthContext
+            setCoverImageBase64(null);
+            setLogoImageBase64(null);
+            setProfileImageBase64(null);
+            
             Alert.alert('Succès', 'Profil mis à jour avec succès');
             setEditing(false);
         } else {
             Alert.alert('Erreur', result.error || 'Impossible de mettre à jour le profil');
+        }
+    };
+
+    const pickCoverImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission requise', 'Nous avons besoin de la permission pour accéder à vos photos.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [16, 9],
+            quality: 0.7,
+            base64: true,
+        });
+
+        if (!result.canceled && result.assets[0]) {
+            const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+            setCoverImageBase64(base64);
+        }
+    };
+
+    const pickLogoImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission requise', 'Nous avons besoin de la permission pour accéder à vos photos.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+            base64: true,
+        });
+
+        if (!result.canceled && result.assets[0]) {
+            const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+            setLogoImageBase64(base64);
+        }
+    };
+
+    const pickProfileImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission requise', 'Nous avons besoin de la permission pour accéder à vos photos.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+            base64: true,
+        });
+
+        if (!result.canceled && result.assets[0]) {
+            const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+            setProfileImageBase64(base64);
         }
     };
 
@@ -111,15 +226,63 @@ const ProfileScreen = ({ navigation }) => {
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <View style={styles.avatarContainer}>
-                        <Ionicons
-                            name={user?.role === 'merchant' ? 'storefront' : 'person'}
-                            size={48}
-                            color="#22c55e"
+                    {/* Cover Image for Merchants */}
+                    {user?.role === 'merchant' && (coverImageBase64 || user?.cover_image_url) && (
+                        <Image 
+                            source={{ uri: coverImageBase64 || user.cover_image_url }} 
+                            style={styles.coverImage}
+                            resizeMode="cover"
                         />
-                    </View>
-                    <Text style={styles.userName}>{user?.name}</Text>
+                    )}
+                    
+                    {/* Profile Image/Avatar */}
+                    <TouchableOpacity 
+                        style={styles.avatarContainer}
+                        onPress={editing && (user?.role === 'customer' ? pickProfileImage : null)}
+                        disabled={!editing || user?.role !== 'customer'}
+                    >
+                        {user?.role === 'merchant' && (logoImageBase64 || user?.logo_url) ? (
+                            <Image 
+                                source={{ uri: logoImageBase64 || user.logo_url }} 
+                                style={styles.avatarImage}
+                            />
+                        ) : user?.role === 'customer' && (profileImageBase64 || user?.profile_image_url) ? (
+                            <Image 
+                                source={{ uri: profileImageBase64 || user.profile_image_url }} 
+                                style={styles.avatarImage}
+                            />
+                        ) : (
+                            <Ionicons
+                                name={user?.role === 'merchant' ? 'storefront' : 'person'}
+                                size={48}
+                                color="#22c55e"
+                            />
+                        )}
+                        {editing && user?.role === 'customer' && (
+                            <View style={styles.editAvatarBadge}>
+                                <Ionicons name="camera" size={16} color="#fff" />
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                    
+                    <Text style={styles.userName}>
+                        {user?.role === 'merchant' ? user?.business_name : user?.name}
+                    </Text>
+                    {user?.role === 'merchant' && user?.tagline && (
+                        <Text style={styles.tagline}>"{user.tagline}"</Text>
+                    )}
                     <Text style={styles.userEmail}>{user?.email}</Text>
+                    
+                    {/* Rating for Merchants */}
+                    {user?.role === 'merchant' && user?.rating > 0 && (
+                        <View style={styles.ratingContainer}>
+                            <Ionicons name="star" size={16} color="#f59e0b" />
+                            <Text style={styles.ratingText}>
+                                {Number(user.rating).toFixed(1)}
+                            </Text>
+                        </View>
+                    )}
+                    
                     <View style={styles.roleBadge}>
                         <Text style={styles.roleText}>
                             {user?.role === 'merchant' ? 'Commerçant' : 'Client'}
@@ -161,16 +324,9 @@ const ProfileScreen = ({ navigation }) => {
                         editable={editing}
                     />
 
-                    <Input
-                        label="Adresse"
-                        value={address}
-                        onChangeText={setAddress}
-                        editable={editing}
-                    />
-
-                    {editing && user?.role === 'merchant' && (
+                    {editing && (user?.role === 'customer' || user?.role === 'merchant') && (
                         <>
-                            <Text style={styles.label}>Position du commerce</Text>
+                            <Text style={styles.label}>Adresse</Text>
                             <LocationPicker
                                 onLocationSelect={async (loc) => {
                                     setLocation(loc);
@@ -181,6 +337,52 @@ const ProfileScreen = ({ navigation }) => {
                                 }}
                                 initialLocation={location}
                             />
+                            {address && (
+                                <Text style={styles.addressText}>{address}</Text>
+                            )}
+                        </>
+                    )}
+
+                    {!editing && address && (
+                        <View style={styles.addressDisplay}>
+                            <Ionicons name="location" size={16} color="#8E8E93" />
+                            <Text style={styles.addressDisplayText}>{address}</Text>
+                        </View>
+                    )}
+
+                    {editing && user?.role === 'merchant' && (
+                        <>
+                            {/* Cover Image */}
+                            <Text style={styles.label}>Image de couverture</Text>
+                            <TouchableOpacity onPress={pickCoverImage} style={styles.imagePicker}>
+                                {(coverImageBase64 || user?.cover_image_url) ? (
+                                    <Image 
+                                        source={{ uri: coverImageBase64 || user.cover_image_url }} 
+                                        style={styles.coverImagePreview} 
+                                    />
+                                ) : (
+                                    <View style={styles.imagePlaceholder}>
+                                        <Ionicons name="image-outline" size={32} color="#8E8E93" />
+                                        <Text style={styles.imagePlaceholderText}>Ajouter une image de couverture</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+
+                            {/* Logo Image */}
+                            <Text style={styles.label}>Logo</Text>
+                            <TouchableOpacity onPress={pickLogoImage} style={styles.logoPicker}>
+                                {(logoImageBase64 || user?.logo_url) ? (
+                                    <Image 
+                                        source={{ uri: logoImageBase64 || user.logo_url }} 
+                                        style={styles.logoPreview} 
+                                    />
+                                ) : (
+                                    <View style={styles.logoPlaceholder}>
+                                        <Ionicons name="camera-outline" size={24} color="#8E8E93" />
+                                        <Text style={styles.imagePlaceholderText}>Ajouter un logo</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
                         </>
                     )}
 
@@ -194,6 +396,13 @@ const ProfileScreen = ({ navigation }) => {
                                     setEmail(user?.email || '');
                                     setPhone(user?.phone || '');
                                     setAddress(user?.address || '');
+                                    setLocation({
+                                        latitude: user?.latitude,
+                                        longitude: user?.longitude
+                                    });
+                                    setCoverImageBase64(user?.cover_image_url || null);
+                                    setLogoImageBase64(user?.logo_url || null);
+                                    setProfileImageBase64(user?.profile_image_url || null);
                                     setEditing(false);
                                 }}
                                 style={styles.cancelButton}
@@ -317,6 +526,16 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    coverImage: {
+        width: '100%',
+        height: 120,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
     },
     avatarContainer: {
         width: 96,
@@ -326,6 +545,48 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
+        marginTop: 20,
+        borderWidth: 4,
+        borderColor: '#fff',
+        position: 'relative',
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 48,
+    },
+    editAvatarBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#22c55e',
+        borderRadius: 12,
+        width: 28,
+        height: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    tagline: {
+        fontSize: 14,
+        color: '#8E8E93',
+        fontStyle: 'italic',
+        marginTop: 4,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    ratingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 4,
+        marginBottom: 12,
+    },
+    ratingText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#000',
     },
     userName: {
         fontSize: 24,
@@ -483,6 +744,78 @@ const styles = StyleSheet.create({
         color: '#374151',
         marginBottom: 8,
         marginTop: 8,
+    },
+    addressText: {
+        fontSize: 14,
+        color: '#8E8E93',
+        marginTop: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: '#F2F2F7',
+        borderRadius: 8,
+    },
+    addressDisplay: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: '#F2F2F7',
+        borderRadius: 8,
+    },
+    addressDisplayText: {
+        fontSize: 14,
+        color: '#8E8E93',
+        flex: 1,
+    },
+    imagePicker: {
+        marginBottom: 16,
+    },
+    coverImagePreview: {
+        width: '100%',
+        height: 180,
+        borderRadius: 12,
+        backgroundColor: '#F2F2F7',
+    },
+    imagePlaceholder: {
+        width: '100%',
+        height: 180,
+        borderRadius: 12,
+        backgroundColor: '#F2F2F7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+        borderStyle: 'dashed',
+    },
+    logoPicker: {
+        marginBottom: 16,
+    },
+    logoPreview: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#F2F2F7',
+        alignSelf: 'center',
+    },
+    logoPlaceholder: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#F2F2F7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+        borderStyle: 'dashed',
+        alignSelf: 'center',
+    },
+    imagePlaceholderText: {
+        marginTop: 8,
+        fontSize: 14,
+        color: '#8E8E93',
+        textAlign: 'center',
     },
 });
 

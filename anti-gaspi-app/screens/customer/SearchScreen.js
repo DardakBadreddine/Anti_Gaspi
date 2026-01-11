@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { searchBaskets } from '../../api/baskets';
 import { addFavorite, removeFavorite } from '../../api/favorites';
+import { getCategories } from '../../api/categories';
 import { getCurrentLocation } from '../../utils/location';
 import ShopCard from '../../components/ShopCard';
 import Button from '../../components/Button';
@@ -30,27 +31,91 @@ const SearchScreen = ({ navigation }) => {
     const [radius, setRadius] = useState(10);
     const [location, setLocation] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [categories, setCategories] = useState([]);
+    const [selectedCategories, setSelectedCategories] = useState([]);
 
     useFocusEffect(
         useCallback(() => {
+            loadCategories();
             loadShops();
         }, [radius])
     );
 
     useEffect(() => {
-        // Filter shops when search query changes
-        if (searchQuery.trim() === '') {
-            setFilteredShops(shops);
-        } else {
+        // Filter shops when search query or categories change
+        let filtered = shops;
+
+        // Filter by search query
+        if (searchQuery.trim() !== '') {
             const query = searchQuery.toLowerCase();
-            const filtered = shops.filter(shop =>
+            filtered = filtered.filter(shop =>
                 shop.business_name.toLowerCase().includes(query) ||
                 shop.address?.toLowerCase().includes(query) ||
                 shop.tagline?.toLowerCase().includes(query)
             );
-            setFilteredShops(filtered);
         }
-    }, [searchQuery, shops]);
+
+        // Filter by selected categories
+        if (selectedCategories.length > 0) {
+            console.log('🔍 Filtering by categories:', {
+                selectedCategories,
+                shopsBeforeFilter: filtered.length
+            });
+            
+            filtered = filtered.filter(shop => {
+                // Check if shop has any paniers
+                if (!shop.paniers || shop.paniers.length === 0) {
+                    return false;
+                }
+                
+                // Check if any of the shop's baskets has at least one selected category
+                const hasMatchingCategory = shop.paniers.some(basket => {
+                    const basketCategories = basket.categories || [];
+                    const basketCategoryIds = basketCategories.map(c => Number(c.id));
+                    const selectedIds = selectedCategories.map(id => Number(id));
+                    
+                    const matches = selectedIds.some(selectedId => basketCategoryIds.includes(selectedId));
+                    
+                    if (matches) {
+                        console.log('✅ Basket matches:', {
+                            shop: shop.business_name,
+                            basketId: basket.id,
+                            basketTitle: basket.title,
+                            basketCategories: basketCategoryIds,
+                            selectedIds
+                        });
+                    }
+                    
+                    return matches;
+                });
+                
+                if (!hasMatchingCategory) {
+                    console.log('❌ Shop filtered out:', shop.business_name, {
+                        paniersCount: shop.paniers?.length,
+                        allBasketCategories: shop.paniers?.map(b => ({
+                            basketId: b.id,
+                            categories: (b.categories || []).map(c => ({ id: c.id, name: c.name }))
+                        }))
+                    });
+                }
+                
+                return hasMatchingCategory;
+            });
+            
+            console.log('🔍 Shops after category filter:', filtered.length);
+        }
+
+        setFilteredShops(filtered);
+    }, [searchQuery, shops, selectedCategories]);
+
+    const loadCategories = async () => {
+        try {
+            const result = await getCategories();
+            setCategories(result.categories || result || []);
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    };
 
     const loadShops = async () => {
         setLoading(true);
@@ -101,6 +166,26 @@ const SearchScreen = ({ navigation }) => {
         navigation.navigate('ShopDetail', { shopId: shop.id, shop });
     };
 
+    const toggleCategory = (categoryId) => {
+        setSelectedCategories(prev => {
+            const newSelection = prev.includes(categoryId)
+                ? prev.filter(id => id !== categoryId)
+                : [...prev, categoryId];
+            
+            console.log('🔍 Category filter changed:', {
+                categoryId,
+                newSelection,
+                totalShops: shops.length
+            });
+            
+            return newSelection;
+        });
+    };
+
+    const clearCategories = () => {
+        setSelectedCategories([]);
+    };
+
     const renderRadiusButton = (km) => {
         const isSelected = radius === km;
         return (
@@ -139,6 +224,48 @@ const SearchScreen = ({ navigation }) => {
                         </TouchableOpacity>
                     )}
                 </View>
+
+                {/* Categories Filter */}
+                {categories.length > 0 && (
+                    <View style={styles.categoriesContainer}>
+                        <View style={styles.categoriesHeader}>
+                            <Text style={styles.categoriesTitle}>Catégories</Text>
+                            {selectedCategories.length > 0 && (
+                                <TouchableOpacity onPress={clearCategories} style={styles.clearCategoriesButton}>
+                                    <Text style={styles.clearCategoriesText}>Effacer</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.categoriesScroll}
+                        >
+                            {categories.map(category => {
+                                const isSelected = selectedCategories.includes(category.id);
+                                return (
+                                    <TouchableOpacity
+                                        key={category.id}
+                                        style={[
+                                            styles.categoryPill,
+                                            isSelected && styles.categoryPillActive,
+                                            { borderColor: category.color || '#22c55e' }
+                                        ]}
+                                        onPress={() => toggleCategory(category.id)}
+                                    >
+                                        <Text style={styles.categoryIcon}>{category.icon || '🏷️'}</Text>
+                                        <Text style={[
+                                            styles.categoryText,
+                                            isSelected && styles.categoryTextActive
+                                        ]}>
+                                            {category.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                )}
 
                 <View style={styles.radiusContainer}>
                     <ScrollView
@@ -243,6 +370,58 @@ const styles = StyleSheet.create({
     },
     clearButton: {
         padding: 4,
+    },
+    categoriesContainer: {
+        marginTop: 8,
+        marginBottom: 12,
+    },
+    categoriesHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    categoriesTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#000',
+    },
+    clearCategoriesButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+    },
+    clearCategoriesText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#22c55e',
+    },
+    categoriesScroll: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    categoryPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#F2F2F7',
+        borderWidth: 1.5,
+        gap: 6,
+    },
+    categoryPillActive: {
+        backgroundColor: '#f0fdf4',
+    },
+    categoryIcon: {
+        fontSize: 16,
+    },
+    categoryText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#8E8E93',
+    },
+    categoryTextActive: {
+        color: '#000',
     },
     radiusContainer: {
         marginTop: 0,

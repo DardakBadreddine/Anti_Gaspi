@@ -87,7 +87,14 @@ const FavoritesScreen = ({ navigation }) => {
         return (
             <TouchableOpacity
                 style={styles.card}
-                onPress={() => navigation.navigate('ShopDetail', { shopId: item.merchant_id, shop: { ...item, id: item.merchant_id } })}
+                onPress={() => navigation.navigate('ShopDetail', { 
+                    shopId: item.merchant_id, 
+                    shop: { 
+                        ...item, 
+                        id: item.merchant_id,
+                        is_favorited: true, // Since it's in favorites, it's definitely favorited
+                    } 
+                })}
                 activeOpacity={0.7}
             >
                 <View style={styles.cardHeader}>

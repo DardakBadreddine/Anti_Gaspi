@@ -43,25 +43,25 @@ const Button = ({
 
 const styles = StyleSheet.create({
     button: {
-        paddingVertical: 14,
+        paddingVertical: 16,
         paddingHorizontal: 24,
-        borderRadius: 12,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 50,
+        minHeight: 56,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
     },
     primaryButton: {
         backgroundColor: '#22c55e',
     },
     secondaryButton: {
-        backgroundColor: '#f3f4f6',
-        borderWidth: 1,
-        borderColor: '#d1d5db',
+        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderColor: '#E5E5EA',
     },
     dangerButton: {
         backgroundColor: '#ef4444',
@@ -71,14 +71,15 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     text: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 17,
+        fontWeight: '700',
+        letterSpacing: -0.2,
     },
     primaryText: {
         color: '#fff',
     },
     secondaryText: {
-        color: '#374151',
+        color: '#000',
     },
     dangerText: {
         color: '#fff',

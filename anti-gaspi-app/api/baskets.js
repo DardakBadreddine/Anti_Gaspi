@@ -24,6 +24,17 @@ export const getMerchantBaskets = async () => {
 };
 
 /**
+ * Get baskets for a specific merchant by merchant ID
+ * @param {number} merchantId - Merchant ID
+ * @returns {Promise} API response with shop data including paniers
+ */
+export const getMerchantShop = async (merchantId) => {
+    console.log('📡 API Call: GET /baskets/merchant/' + merchantId);
+    const response = await apiClient.get(`/baskets/merchant/${merchantId}`);
+    return response.data;
+};
+
+/**
  * Get basket details by ID
  * @param {number} basketId - Basket ID
  * @returns {Promise} API response with basket details
@@ -36,6 +47,8 @@ export const getBasketDetails = async (basketId) => {
 /**
  * Create a new basket (merchant only)
  * @param {Object} basketData - Basket data
+ * @param {string} basketData.imageUrl - Optional image URL
+ * @param {number[]} basketData.categoryIds - Optional array of category IDs
  * @returns {Promise} API response
  */
 export const createBasket = async (basketData) => {

@@ -5,12 +5,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
 // Auth screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 
 // Customer screens
 import SearchScreen from '../screens/customer/SearchScreen';
@@ -20,6 +22,7 @@ import ReservationDetailScreen from '../screens/customer/ReservationDetailScreen
 import FavoritesScreen from '../screens/customer/FavoritesScreen';
 import MapScreen from '../screens/customer/MapScreen';
 import ShopDetailScreen from '../screens/customer/ShopDetailScreen';
+import ReviewScreen from '../screens/customer/ReviewScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 // Merchant screens
@@ -184,15 +187,35 @@ const MerchantTabs = () => {
 // Main App Navigator
 const AppNavigator = () => {
     const { user, isAuthenticated, loading } = useAuth();
+    const [showOnboarding, setShowOnboarding] = React.useState(null);
     usePushNotifications();
 
-    if (loading) {
+    React.useEffect(() => {
+        const checkOnboarding = async () => {
+            try {
+                const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
+                setShowOnboarding(hasSeenOnboarding !== 'true');
+            } catch (error) {
+                console.error('Error checking onboarding:', error);
+                setShowOnboarding(true);
+            }
+        };
+        checkOnboarding();
+    }, []);
+
+    if (loading || showOnboarding === null) {
         return null; // Or a loading screen
     }
 
+    const handleOnboardingComplete = () => {
+        setShowOnboarding(false);
+    };
+
     return (
         <NavigationContainer>
-            {!isAuthenticated ? (
+            {showOnboarding ? (
+                <OnboardingScreen onComplete={handleOnboardingComplete} />
+            ) : !isAuthenticated ? (
                 // Auth Stack
                 <Stack.Navigator screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="Login" component={LoginScreen} />
@@ -205,6 +228,7 @@ const AppNavigator = () => {
                     <Stack.Screen name="ShopDetail" component={ShopDetailScreen} />
                     <Stack.Screen name="BasketDetails" component={BasketDetailsScreen} />
                     <Stack.Screen name="ReservationDetail" component={ReservationDetailScreen} />
+                    <Stack.Screen name="Review" component={ReviewScreen} />
                 </Stack.Navigator>
             ) : (
                 // Merchant Stack

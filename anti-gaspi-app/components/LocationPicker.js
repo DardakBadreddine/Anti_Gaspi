@@ -10,7 +10,7 @@ const LocationPicker = ({ onLocationSelect, initialLocation }) => {
 
     useEffect(() => {
         const initLocation = async () => {
-            if (initialLocation) {
+            if (initialLocation && initialLocation.latitude && initialLocation.longitude) {
                 setRegion({
                     latitude: initialLocation.latitude,
                     longitude: initialLocation.longitude,
@@ -21,7 +21,7 @@ const LocationPicker = ({ onLocationSelect, initialLocation }) => {
             } else {
                 try {
                     const location = await getCurrentLocation();
-                    if (location) {
+                    if (location && location.latitude && location.longitude) {
                         setRegion({
                             latitude: location.latitude,
                             longitude: location.longitude,
@@ -32,6 +32,8 @@ const LocationPicker = ({ onLocationSelect, initialLocation }) => {
                             latitude: location.latitude,
                             longitude: location.longitude,
                         });
+                    } else {
+                        throw new Error('Invalid location');
                     }
                 } catch (error) {
                     console.log('Error getting location for picker:', error);
@@ -49,14 +51,16 @@ const LocationPicker = ({ onLocationSelect, initialLocation }) => {
         };
 
         initLocation();
-    }, []);
+    }, [initialLocation]);
 
     const handleRegionChangeComplete = (newRegion) => {
-        setRegion(newRegion);
-        onLocationSelect({
-            latitude: newRegion.latitude,
-            longitude: newRegion.longitude,
-        });
+        if (newRegion && newRegion.latitude && newRegion.longitude) {
+            setRegion(newRegion);
+            onLocationSelect({
+                latitude: newRegion.latitude,
+                longitude: newRegion.longitude,
+            });
+        }
     };
 
     if (loading || !region) {
@@ -68,11 +72,19 @@ const LocationPicker = ({ onLocationSelect, initialLocation }) => {
         );
     }
 
+    // Ensure region has valid values
+    const validRegion = {
+        latitude: region.latitude || 33.5731,
+        longitude: region.longitude || -7.5898,
+        latitudeDelta: region.latitudeDelta || 0.05,
+        longitudeDelta: region.longitudeDelta || 0.05,
+    };
+
     return (
         <View style={styles.container}>
             <MapView
                 style={styles.map}
-                region={region}
+                initialRegion={validRegion}
                 onRegionChangeComplete={handleRegionChangeComplete}
                 showsUserLocation={true}
                 showsMyLocationButton={true}

@@ -7,13 +7,16 @@ import {
     Platform,
     ScrollView,
     Alert,
+    Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 
 const LoginScreen = ({ navigation }) => {
     const { login } = useAuth();
+    const insets = useSafeAreaInsets();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -38,9 +41,20 @@ const LoginScreen = ({ navigation }) => {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView 
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 }
+                ]}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
                 <View style={styles.header}>
-                    <Text style={styles.logo}>🌱</Text>
+                    <Image 
+                        source={require('../../assets/images/antigaspiLogo.png')} 
+                        style={styles.logoImage}
+                        resizeMode="contain"
+                    />
                     <Text style={styles.title}>Anti-Gaspi</Text>
                     <Text style={styles.subtitle}>Réduisons le gaspillage alimentaire ensemble</Text>
                 </View>
@@ -52,6 +66,7 @@ const LoginScreen = ({ navigation }) => {
                         onChangeText={setEmail}
                         placeholder="votre@email.com"
                         keyboardType="email-address"
+                        style={styles.input}
                     />
 
                     <Input
@@ -60,6 +75,7 @@ const LoginScreen = ({ navigation }) => {
                         onChangeText={setPassword}
                         placeholder="••••••••"
                         secureTextEntry
+                        style={styles.input}
                     />
 
                     <Button
@@ -73,6 +89,7 @@ const LoginScreen = ({ navigation }) => {
                         title="Créer un compte"
                         onPress={() => navigation.navigate('Register')}
                         variant="secondary"
+                        style={styles.registerButton}
                     />
                 </View>
             </ScrollView>
@@ -83,37 +100,54 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f9fafb',
+        backgroundColor: '#F2F2F7',
     },
     scrollContent: {
         flexGrow: 1,
         justifyContent: 'center',
-        padding: 24,
+        paddingHorizontal: 24,
     },
     header: {
         alignItems: 'center',
         marginBottom: 48,
     },
     logo: {
-        fontSize: 64,
-        marginBottom: 16,
+        fontSize: 72,
+        marginBottom: 20,
+    },
+    logoImage: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        marginBottom: 24,
+        overflow: 'hidden',
     },
     title: {
-        fontSize: 32,
-        fontWeight: '700',
-        color: '#1f2937',
-        marginBottom: 8,
+        fontSize: 34,
+        fontWeight: '800',
+        color: '#000',
+        marginBottom: 12,
+        letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: 16,
-        color: '#6b7280',
+        color: '#8E8E93',
         textAlign: 'center',
+        paddingHorizontal: 20,
+        lineHeight: 22,
     },
     form: {
         width: '100%',
     },
+    input: {
+        marginBottom: 20,
+    },
     loginButton: {
-        marginBottom: 12,
+        marginTop: 8,
+        marginBottom: 16,
+    },
+    registerButton: {
+        marginBottom: 0,
     },
 });
 

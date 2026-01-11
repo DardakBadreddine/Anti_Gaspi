@@ -1,21 +1,62 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// Configure based on device type:
-// - Android Emulator: Use 10.0.2.2 (special emulator address)
-// - Physical Device / Expo Go: Use your machine's IP address
-// - iOS Simulator: Use localhost
-//
-// To find your IP: Run 'ipconfig' on Windows and look for IPv4 Address
-// Current IP: 192.168.11.128
-// Universal IP for all devices (Android Emulator, iOS Simulator, Physical Devices)
-// Ensure your phone is on the same WiFi network.
-const SERVER_IP = '192.168.11.128';
-const BASE_URL = `http://${SERVER_IP}:3000/api`;
+/**
+ * Automatically detect the API base URL
+ * Priority:
+ * 1. Environment variable (for production)
+ * 2. Expo dev server hostname (for development)
+ * 3. Platform-specific defaults
+ */
+const getApiBaseUrl = () => {
+    // Production: Use environment variable if set
+    if (process.env.EXPO_PUBLIC_API_URL) {
+        console.log('📦 Using production API URL from environment');
+        return process.env.EXPO_PUBLIC_API_URL;
+    }
+
+    // Development: Extract IP from Expo dev server
+    // Try multiple sources for hostUri (different Expo versions)
+    const hostUri = 
+        Constants.expoConfig?.hostUri || 
+        Constants.manifest?.hostUri || 
+        Constants.manifest?.debuggerHost ||
+        Constants.manifest2?.extra?.expoGo?.hostUri;
+
+    if (hostUri) {
+        // Extract IP address from hostUri (format: "192.168.1.100:8081" or "192.168.1.100")
+        const ipMatch = hostUri.match(/^(\d+\.\d+\.\d+\.\d+)/);
+        if (ipMatch) {
+            const serverIp = ipMatch[1];
+            const apiUrl = `http://${serverIp}:3000/api`;
+            console.log('🔍 Auto-detected API URL from Expo:', apiUrl);
+            return apiUrl;
+        }
+    }
+
+    // Fallback: Platform-specific defaults
+    if (Platform.OS === 'android') {
+        // Android emulator uses special address to access host machine
+        console.log('📱 Using Android emulator default');
+        return 'http://10.0.2.2:3000/api';
+    } else if (Platform.OS === 'ios') {
+        // iOS simulator can use localhost
+        console.log('📱 Using iOS simulator default');
+        return 'http://localhost:3000/api';
+    }
+
+    // Last resort: Try localhost
+    console.log('⚠️ Using localhost fallback');
+    return 'http://localhost:3000/api';
+};
+
+const BASE_URL = getApiBaseUrl();
 
 console.log('🌐 API Base URL:', BASE_URL);
 console.log('📱 Platform:', Platform.OS);
+console.log('🔧 Expo Host URI:', Constants.expoConfig?.hostUri || Constants.manifest?.hostUri || 'Not available');
 
 const apiClient = axios.create({
     baseURL: BASE_URL,
