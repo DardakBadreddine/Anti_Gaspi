@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,38 +8,32 @@ import {
     Alert,
     TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { searchBaskets, deleteBasket } from '../../api/baskets';
-import { useAuth } from '../../contexts/AuthContext';
+import { getMerchantBaskets, deleteBasket } from '../../api/baskets';
 import CountdownTimer from '../../components/CountdownTimer';
 import Button from '../../components/Button';
-import ProfileHeaderButton from '../../components/ProfileHeaderButton';
 
 const MerchantBasketsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
-    const { user } = useAuth();
     const [baskets, setBaskets] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        loadBaskets();
-    }, []);
-
-    useEffect(() => {
-        const unsubscribe = navigation.addListener('focus', () => {
+    useFocusEffect(
+        useCallback(() => {
             loadBaskets();
-        });
-        return unsubscribe;
-    }, [navigation]);
+        }, [])
+    );
 
     const loadBaskets = async () => {
         setLoading(true);
         try {
-            // For merchants, we get baskets at their location with a large radius
-            const result = await searchBaskets(0, 0, 10000);
+            const result = await getMerchantBaskets();
             setBaskets(result.baskets || []);
         } catch (error) {
             console.error('Error loading baskets:', error);
+            Alert.alert('Erreur', 'Impossible de charger vos paniers');
         }
         setLoading(false);
     };
@@ -104,7 +98,8 @@ const MerchantBasketsScreen = ({ navigation }) => {
                         onPress={() => handleDelete(item.id, item.title)}
                         style={styles.deleteButton}
                     >
-                        <Text style={styles.deleteText}>🗑️ Supprimer</Text>
+                        <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                        <Text style={styles.deleteText}>Supprimer</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -113,13 +108,13 @@ const MerchantBasketsScreen = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
-            <View style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 20) + 20 }]}>
-                <View style={styles.headerTop}>
-                    <Text style={styles.headerTitle}>Mes Paniers</Text>
-                    <ProfileHeaderButton />
-                </View>
+            <View style={[styles.headerContainer, { paddingTop: insets.top + 16 }]}>
+                <Text style={styles.headerTitle}>Mes Paniers</Text>
+                <Text style={styles.headerSubtitle}>
+                    {baskets.length} panier{baskets.length !== 1 ? 's' : ''} actif{baskets.length !== 1 ? 's' : ''}
+                </Text>
                 <Button
-                    title="+ Ajouter un panier"
+                    title="+ Nouveau panier"
                     onPress={() => navigation.navigate('AddBasket')}
                     style={styles.addButton}
                 />
@@ -134,12 +129,12 @@ const MerchantBasketsScreen = ({ navigation }) => {
                     { paddingBottom: 100 }
                 ]}
                 refreshControl={
-                    <RefreshControl refreshing={loading} onRefresh={loadBaskets} />
+                    <RefreshControl refreshing={loading} onRefresh={loadBaskets} tintColor="#22c55e" />
                 }
                 ListEmptyComponent={
                     !loading && (
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyText}>📦</Text>
+                            <Ionicons name="basket-outline" size={64} color="#E5E5EA" />
                             <Text style={styles.emptyTitle}>Aucun panier actif</Text>
                             <Text style={styles.emptySubtitle}>
                                 Créez votre premier panier anti-gaspi
@@ -160,29 +155,32 @@ const MerchantBasketsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f9fafb',
+        backgroundColor: '#F2F2F7',
     },
     headerContainer: {
         backgroundColor: '#fff',
-        padding: 20,
-        // paddingTop dynamic
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 5,
+        zIndex: 10,
     },
     headerTitle: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: '#1f2937',
+        fontSize: 34,
+        fontWeight: '800',
+        color: '#000',
+        letterSpacing: -0.5,
     },
-    headerTop: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+    headerSubtitle: {
+        fontSize: 15,
+        color: '#8E8E93',
+        fontWeight: '500',
+        marginTop: 4,
         marginBottom: 16,
     },
     addButton: {
@@ -198,9 +196,9 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.05,
         shadowRadius: 8,
-        elevation: 3,
+        elevation: 2,
     },
     header: {
         flexDirection: 'row',
@@ -215,7 +213,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1f2937',
+        color: '#000',
         marginBottom: 4,
     },
     description: {
@@ -262,8 +260,12 @@ const styles = StyleSheet.create({
     quantity: {
         fontSize: 14,
         color: '#6b7280',
+        fontWeight: '500',
     },
     deleteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
         paddingHorizontal: 12,
         paddingVertical: 6,
     },
@@ -275,21 +277,18 @@ const styles = StyleSheet.create({
     emptyContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 60,
-    },
-    emptyText: {
-        fontSize: 64,
-        marginBottom: 16,
+        paddingVertical: 80,
     },
     emptyTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1f2937',
+        color: '#000',
+        marginTop: 16,
         marginBottom: 8,
     },
     emptySubtitle: {
         fontSize: 16,
-        color: '#6b7280',
+        color: '#8E8E93',
         textAlign: 'center',
         marginBottom: 24,
     },

@@ -37,3 +37,13 @@ export const validateReservation = async (qrCode) => {
     const response = await apiClient.post('/reservations/validate', { qrCode });
     return response.data;
 };
+
+/**
+ * Cancel a reservation
+ * @param {number} id - Reservation ID
+ * @returns {Promise} API response
+ */
+export const cancelReservation = async (id) => {
+    const response = await apiClient.patch(`/reservations/${id}/cancel`);
+    return response.data;
+};

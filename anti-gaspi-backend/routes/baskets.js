@@ -1,222 +1,292 @@
 const express = require('express');
+const { authenticate, requireMerchant, tryAuthenticate } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
-const { authenticate, requireMerchant } = require('../middleware/auth');
-const { filterByDistance } = require('../utils/geo');
+const fetch = require('node-fetch');
 
 function createBasketRoutes(db) {
     const router = express.Router();
 
+    // Helper for distance (Haversine)
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+        const R = 6371; // km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
     /**
      * GET /api/baskets
-     * Search baskets by geolocation and radius
-     * Query params: lat, lng, radius (in km)
+     * Search shops with paniers
+     * PUBLIC/AUTHENTICATED
      */
-    router.get('/', authenticate, (req, res) => {
-        const { lat, lng, radius = 5 } = req.query;
-
-        if (!lat || !lng) {
-            return res.status(400).json({ error: 'Latitude et longitude requises' });
-        }
-
-        const userLat = parseFloat(lat);
-        const userLng = parseFloat(lng);
-        const radiusKm = parseFloat(radius);
+    router.get('/', tryAuthenticate, (req, res) => {
+        const { lat, lng, radius = 50 } = req.query; // Default radius increased
+        const userId = req.user ? req.user.userId : 0;
 
         try {
-            // Get all active baskets with merchant info
-            const baskets = db.prepare(`
-        SELECT 
-          b.*,
-          m.business_name,
-          u.latitude,
-          u.longitude,
-          u.address,
-          (b.quantity - COALESCE((
-            SELECT COUNT(*) 
-            FROM reservations r 
-            WHERE r.basket_id = b.id AND r.status = 'pending'
-          ), 0)) as available_quantity
-        FROM baskets b
-        JOIN merchants m ON b.merchant_id = m.id
-        JOIN users u ON m.user_id = u.id
-        WHERE datetime(b.expires_at) > datetime('now')
-        AND b.quantity > 0
-      `).all();
+            // 1. Get all merchants with their location
+            const shops = db.prepare(`
+                SELECT 
+                    m.id, m.business_name, m.rating, m.tagline, m.phone, m.logo_url,
+                    u.latitude, u.longitude, u.address,
+                    (SELECT COUNT(*) FROM favorites f WHERE f.merchant_id = m.id AND f.user_id = ?) as is_favorited_count
+                FROM merchants m
+                JOIN users u ON m.user_id = u.id
+            `).all(userId);
 
-            // Filter by distance
-            const filteredBaskets = filterByDistance(baskets, userLat, userLng, radiusKm);
+            // 2. Filter by distance & attach baskets
+            const results = shops.map(shop => {
+                let distance = null;
+                if (lat && lng && shop.latitude && shop.longitude) {
+                    distance = calculateDistance(
+                        parseFloat(lat), parseFloat(lng),
+                        shop.latitude, shop.longitude
+                    );
+                }
 
-            // Only return baskets with available quantity
-            const availableBaskets = filteredBaskets.filter(b => b.available_quantity > 0);
+                // Fetch active baskets for this shop
+                const paniers = db.prepare(`
+                    SELECT 
+                        b.*,
+                        (b.quantity - COALESCE((
+                            SELECT COUNT(*) 
+                            FROM reservations r 
+                            WHERE r.basket_id = b.id AND r.status = 'pending'
+                        ), 0)) as available_quantity
+                    FROM baskets b
+                    WHERE b.merchant_id = ? 
+                    AND b.visible = 1
+                    AND datetime(b.expires_at) > datetime('now')
+                `).all(shop.id);
 
-            res.json({ baskets: availableBaskets });
+                return {
+                    ...shop,
+                    distance,
+                    is_favorited: shop.is_favorited_count > 0,
+                    paniers: paniers.filter(p => p.available_quantity > 0)
+                };
+            }).filter(shop => {
+                // Filter by radius if provided, otherwise show all if radius not strict
+                if (!lat || !lng) return true; // No user location = show all
+                return shop.distance <= parseFloat(radius);
+            });
+
+            // Sort by distance
+            results.sort((a, b) => {
+                if (a.distance === null) return 1;
+                if (b.distance === null) return -1;
+                return a.distance - b.distance;
+            });
+
+            res.json({ shops: results });
         } catch (error) {
-            console.error('Get baskets error:', error);
-            res.status(500).json({ error: 'Erreur lors de la récupération des paniers' });
+            console.error('Search error:', error);
+            res.status(500).json({ error: 'Erreur de recherche' });
+        }
+    });
+
+    /**
+     * GET /api/baskets/merchant
+     * Get merchant's own baskets
+     */
+    router.get('/merchant', authenticate, requireMerchant, (req, res) => {
+        try {
+            const merchant = db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(req.user.userId);
+            if (!merchant) {
+                return res.status(403).json({ error: 'Profil commerçant introuvable' });
+            }
+
+            const baskets = db.prepare(`
+                SELECT 
+                  b.*,
+                  (b.quantity - COALESCE((
+                    SELECT COUNT(*) 
+                    FROM reservations r 
+                    WHERE r.basket_id = b.id AND r.status = 'pending'
+                  ), 0)) as available_quantity
+                FROM baskets b
+                WHERE b.merchant_id = ?
+                ORDER BY b.created_at DESC
+            `).all(merchant.id);
+
+            res.json({ baskets });
+        } catch (error) {
+            console.error('Get merchant baskets error:', error);
+            res.status(500).json({ error: 'Erreur serveur' });
         }
     });
 
     /**
      * GET /api/baskets/:id
-     * Get basket details
+     * Get detailed basket info
      */
-    router.get('/:id', authenticate, (req, res) => {
-        const { id } = req.params;
-
+    router.get('/:id', (req, res) => {
         try {
             const basket = db.prepare(`
-        SELECT 
-          b.*,
-          m.business_name,
-          m.description as merchant_description,
-          m.phone,
-          u.latitude,
-          u.longitude,
-          u.address,
-          (b.quantity - COALESCE((
-            SELECT COUNT(*) 
-            FROM reservations r 
-            WHERE r.basket_id = b.id AND r.status = 'pending'
-          ), 0)) as available_quantity
-        FROM baskets b
-        JOIN merchants m ON b.merchant_id = m.id
-        JOIN users u ON m.user_id = u.id
-        WHERE b.id = ?
-      `).get(id);
+                SELECT b.*, m.business_name, u.address, u.latitude, u.longitude
+                FROM baskets b
+                JOIN merchants m ON b.merchant_id = m.id
+                JOIN users u ON m.user_id = u.id
+                WHERE b.id = ?
+            `).get(req.params.id);
 
             if (!basket) {
                 return res.status(404).json({ error: 'Panier introuvable' });
             }
-
-            // Check if expired
-            const now = new Date();
-            const expiresAt = new Date(basket.expires_at);
-
-            if (expiresAt <= now) {
-                return res.status(410).json({ error: 'Ce panier a expiré' });
-            }
-
-            res.json({ basket });
+            res.json(basket);
         } catch (error) {
-            console.error('Get basket error:', error);
-            res.status(500).json({ error: 'Erreur lors de la récupération du panier' });
+            res.status(500).json({ error: 'Erreur serveur' });
         }
     });
 
     /**
      * POST /api/baskets
-     * Create a new basket (merchant only)
+     * Create a new basket
      */
-    router.post('/',
-        authenticate,
-        requireMerchant,
-        body('title').trim().notEmpty(),
-        body('description').optional().trim(),
+    router.post('/', authenticate, requireMerchant, [
+        body('title').notEmpty().trim(),
         body('originalPrice').isFloat({ min: 0 }),
         body('discountedPrice').isFloat({ min: 0 }),
         body('quantity').isInt({ min: 1 }),
-        (req, res) => {
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({ errors: errors.array() });
-            }
-
-            const { title, description, originalPrice, discountedPrice, quantity } = req.body;
-
-            try {
-                // Get merchant ID
-                const merchant = db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(req.user.userId);
-
-                if (!merchant) {
-                    return res.status(403).json({ error: 'Profil commerçant introuvable' });
-                }
-
-                // Calculate expiration (1 hour from now)
-                const now = new Date();
-                const expiresAt = new Date(now.getTime() + 60 * 60 * 1000);
-
-                // Insert basket
-                const insertBasket = db.prepare(`
-          INSERT INTO baskets (merchant_id, title, description, original_price, discounted_price, quantity, expires_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-
-                const result = insertBasket.run(
-                    merchant.id,
-                    title,
-                    description || null,
-                    originalPrice,
-                    discountedPrice,
-                    quantity,
-                    expiresAt.toISOString()
-                );
-
-                res.status(201).json({
-                    message: 'Panier créé avec succès',
-                    basket: {
-                        id: result.lastInsertRowid,
-                        title,
-                        description,
-                        original_price: originalPrice,
-                        discounted_price: discountedPrice,
-                        quantity,
-                        expires_at: expiresAt.toISOString()
-                    }
-                });
-            } catch (error) {
-                console.error('Create basket error:', error);
-                res.status(500).json({ error: 'Erreur lors de la création du panier' });
-            }
+        body('durationHours').optional().isFloat({ min: 0.5, max: 48 })
+    ], (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
         }
-    );
+
+        const { title, description, originalPrice, discountedPrice, quantity, durationHours = 1, autoRelist = false } = req.body;
+
+        try {
+            const merchant = db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(req.user.userId);
+            if (!merchant) {
+                return res.status(403).json({ error: 'Profil commerçant introuvable' });
+            }
+
+            // Calculate expiration based on duration
+            const now = new Date();
+            const expiresAt = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
+
+            const result = db.prepare(`
+                INSERT INTO baskets (merchant_id, title, description, original_price, discounted_price, quantity, expires_at, auto_relist)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(merchant.id, title, description, originalPrice, discountedPrice, quantity, expiresAt.toISOString(), autoRelist ? 1 : 0);
+
+            // Send Notifications to followers
+            (async () => {
+                try {
+                    const favorites = db.prepare(`
+                        SELECT pt.token 
+                        FROM favorites f
+                        JOIN push_tokens pt ON f.user_id = pt.user_id
+                        WHERE f.merchant_id = ?
+                    `).all(merchant.id);
+
+                    if (favorites.length > 0) {
+                        const messages = favorites.map(fav => ({
+                            to: fav.token,
+                            sound: 'default',
+                            title: 'Nouveau Panier ! 🧺',
+                            body: `${merchant.business_name || 'Un commerce'} vient d'ajouter un panier Anti-Gaspi !`,
+                            data: { basketId: result.lastInsertRowid, type: 'new_basket' },
+                        }));
+
+                        await fetch('https://exp.host/--/api/v2/push/send', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Accept-encoding': 'gzip, deflate',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(messages),
+                        });
+                        console.log(`🔔 Sent ${favorites.length} notifications`);
+                    }
+                } catch (notifError) {
+                    console.error('Notification error:', notifError);
+                }
+            })();
+
+            res.status(201).json({
+                message: 'Panier créé',
+                basket: { id: result.lastInsertRowid, title, expires_at: expiresAt }
+            });
+        } catch (error) {
+            console.error('Create basket error:', error);
+            res.status(500).json({ error: 'Erreur lors de la création' });
+        }
+    });
 
     /**
      * DELETE /api/baskets/:id
-     * Delete a basket (merchant only)
+     * Delete a basket
      */
     router.delete('/:id', authenticate, requireMerchant, (req, res) => {
-        const { id } = req.params;
-
         try {
-            // Get merchant ID
             const merchant = db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(req.user.userId);
 
-            // Verify ownership
-            const basket = db.prepare('SELECT * FROM baskets WHERE id = ? AND merchant_id = ?').get(id, merchant.id);
+            const result = db.prepare(`
+                DELETE FROM baskets 
+                WHERE id = ? AND merchant_id = ?
+            `).run(req.params.id, merchant.id);
 
-            if (!basket) {
-                return res.status(404).json({ error: 'Panier introuvable ou accès non autorisé' });
+            if (result.changes === 0) {
+                return res.status(404).json({ error: 'Panier introuvable ou vous n\'êtes pas le propriétaire' });
             }
 
-            // Delete basket
-            db.prepare('DELETE FROM baskets WHERE id = ?').run(id);
-
-            res.json({ message: 'Panier supprimé avec succès' });
+            res.json({ message: 'Panier supprimé' });
         } catch (error) {
-            console.error('Delete basket error:', error);
-            res.status(500).json({ error: 'Erreur lors de la suppression du panier' });
+            res.status(500).json({ error: 'Erreur lors de la suppression' });
         }
     });
 
     return router;
 }
 
-// Background task to clean up expired baskets
 function startBasketCleanup(db) {
+    console.log("⏱️ Starting cleanup scheduler...");
     setInterval(() => {
         try {
-            const result = db.prepare(`
-        DELETE FROM baskets 
-        WHERE datetime(expires_at) <= datetime('now')
-      `).run();
+            // 1. Find expired pending reservations
+            // Only targets reservations linked to baskets that have now expired
+            const expiredReservations = db.prepare(`
+                SELECT r.id, r.basket_id, b.auto_relist
+                FROM reservations r 
+                JOIN baskets b ON r.basket_id = b.id 
+                WHERE r.status = 'pending' 
+                AND datetime(b.expires_at) < datetime('now')
+            `).all();
 
-            if (result.changes > 0) {
-                console.log(`🧹 Cleaned up ${result.changes} expired baskets`);
+            if (expiredReservations.length > 0) {
+                console.log(`🧹 Processing ${expiredReservations.length} expired reservations...`);
+
+                const updateStatus = db.prepare("UPDATE reservations SET status = 'expired' WHERE id = ?");
+                const restockBasket = db.prepare("UPDATE baskets SET quantity = quantity + 1 WHERE id = ?");
+
+                const runTransaction = db.transaction(() => {
+                    for (const res of expiredReservations) {
+                        // Mark as expired
+                        updateStatus.run(res.id);
+
+                        // Restock if enabled
+                        if (res.auto_relist === 1) {
+                            console.log(`♻️ Auto-relisting basket ${res.basket_id}`);
+                            restockBasket.run(res.basket_id);
+                        }
+                    }
+                });
+
+                runTransaction();
             }
         } catch (error) {
             console.error('Basket cleanup error:', error);
         }
-    }, 60000); // Run every minute
+    }, 60000); // Check every minute
 }
 
 module.exports = { createBasketRoutes, startBasketCleanup };

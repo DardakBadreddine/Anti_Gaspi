@@ -59,7 +59,18 @@ function createAuthRoutes(db) {
                 res.status(201).json({
                     message: 'Compte créé avec succès',
                     token,
-                    user: { id: userId, email, role, name }
+                    user: {
+                        id: userId,
+                        email,
+                        role,
+                        name,
+                        address: address || null,
+                        latitude: latitude || null,
+                        longitude: longitude || null,
+                        phone: role === 'merchant' ? phone : null,
+                        business_name: role === 'merchant' ? (businessName || name) : null,
+                        description: role === 'merchant' ? description : null,
+                    }
                 });
             } catch (error) {
                 console.error('Registration error:', error);
@@ -105,11 +116,21 @@ function createAuthRoutes(db) {
                     { expiresIn: '30d' }
                 );
 
-                // Get merchant ID if merchant
-                let merchantId = null;
+                // Get merchant details if merchant
+                let merchantData = null;
                 if (user.role === 'merchant') {
-                    const merchant = db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(user.id);
-                    merchantId = merchant ? merchant.id : null;
+                    const merchant = db.prepare('SELECT * FROM merchants WHERE user_id = ?').get(user.id);
+                    if (merchant) {
+                        merchantData = {
+                            id: merchant.id,
+                            business_name: merchant.business_name,
+                            description: merchant.description,
+                            phone: merchant.phone,
+                            logo_url: merchant.logo_url,
+                            rating: merchant.rating,
+                            tagline: merchant.tagline,
+                        };
+                    }
                 }
 
                 res.json({
@@ -120,7 +141,13 @@ function createAuthRoutes(db) {
                         email: user.email,
                         role: user.role,
                         name: user.name,
-                        merchantId
+                        address: user.address,
+                        latitude: user.latitude,
+                        longitude: user.longitude,
+                        merchantId: merchantData?.id,
+                        phone: merchantData?.phone,
+                        business_name: merchantData?.business_name,
+                        description: merchantData?.description,
                     }
                 });
             } catch (error) {
@@ -178,11 +205,21 @@ function createAuthRoutes(db) {
             // Fetch updated user to return
             const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 
-            // Get merchant ID if merchant
-            let merchantId = null;
+            // Get merchant details if merchant
+            let merchantData = null;
             if (user.role === 'merchant') {
-                const merchant = db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(user.id);
-                merchantId = merchant ? merchant.id : null;
+                const merchant = db.prepare('SELECT * FROM merchants WHERE user_id = ?').get(user.id);
+                if (merchant) {
+                    merchantData = {
+                        id: merchant.id,
+                        business_name: merchant.business_name,
+                        description: merchant.description,
+                        phone: merchant.phone,
+                        logo_url: merchant.logo_url,
+                        rating: merchant.rating,
+                        tagline: merchant.tagline,
+                    };
+                }
             }
 
             res.json({
@@ -192,7 +229,13 @@ function createAuthRoutes(db) {
                     email: user.email,
                     role: user.role,
                     name: user.name,
-                    merchantId
+                    address: user.address,
+                    latitude: user.latitude,
+                    longitude: user.longitude,
+                    merchantId: merchantData?.id,
+                    phone: merchantData?.phone,
+                    business_name: merchantData?.business_name,
+                    description: merchantData?.description,
                 }
             });
         } catch (error) {

@@ -12,7 +12,8 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
-import { getCurrentLocation } from '../../utils/location';
+import LocationPicker from '../../components/LocationPicker';
+import { getCurrentLocation, getAddressFromCoordinates } from '../../utils/location';
 
 const RegisterScreen = ({ navigation }) => {
     const { register } = useAuth();
@@ -143,12 +144,17 @@ const RegisterScreen = ({ navigation }) => {
                             placeholder="123 Rue de la Paix, Paris"
                         />
 
-                        <Button
-                            title={location ? '✓ Position récupérée' : 'Récupérer ma position *'}
-                            onPress={handleGetLocation}
-                            loading={locationLoading}
-                            variant={location ? 'secondary' : 'primary'}
-                            style={styles.locationButton}
+                        <Input
+                            label="Adresse *"
+                            value={address}
+                            onChangeText={setAddress}
+                            placeholder="123 Rue de la Paix, Paris"
+                        />
+
+                        <Text style={styles.label}>Position du commerce *</Text>
+                        <LocationPicker
+                            onLocationSelect={setLocation}
+                            initialLocation={null}
                         />
 
                         <Input
@@ -229,6 +235,13 @@ const styles = StyleSheet.create({
     },
     locationButton: {
         marginBottom: 16,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+        marginTop: 8,
     },
     registerButton: {
         marginBottom: 12,

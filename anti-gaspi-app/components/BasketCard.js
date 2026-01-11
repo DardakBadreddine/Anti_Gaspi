@@ -13,7 +13,7 @@ const FOOD_IMAGES = [
     'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80', // Salad
 ];
 
-const BasketCard = ({ basket, onPress }) => {
+const BasketCard = ({ basket, onPress, showMerchantInfo = true }) => {
     const discount = Math.round(
         ((basket.original_price - basket.discounted_price) / basket.original_price) * 100
     );
@@ -42,11 +42,6 @@ const BasketCard = ({ basket, onPress }) => {
                     </View>
                 )}
 
-                {/* Favorite Icon (Visual only for now) */}
-                <View style={styles.favoriteButton}>
-                    <Ionicons name="heart-outline" size={20} color="#fff" />
-                </View>
-
                 {/* Timer Badge positioned on image */}
                 <View style={styles.timerBadge}>
                     <CountdownTimer expiresAt={basket.expires_at} compact />
@@ -58,15 +53,19 @@ const BasketCard = ({ basket, onPress }) => {
                 <View style={styles.headerRow}>
                     <View style={styles.titleContainer}>
                         <Text style={styles.title} numberOfLines={1}>{basket.title}</Text>
-                        <Text style={styles.merchant}>
-                            {basket.business_name} • {basket.distance ? formatDistance(basket.distance) : 'À proximité'}
-                        </Text>
+                        {showMerchantInfo && (
+                            <Text style={styles.merchant}>
+                                {basket.business_name} • {basket.distance ? formatDistance(basket.distance) : 'À proximité'}
+                            </Text>
+                        )}
                     </View>
 
                     {/* Merchant Avatar (Placeholder) */}
-                    <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>{basket.business_name?.substring(0, 1) || 'M'}</Text>
-                    </View>
+                    {showMerchantInfo && (
+                        <View style={styles.avatar}>
+                            <Text style={styles.avatarText}>{basket.business_name?.substring(0, 1) || 'M'}</Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Price Row */}

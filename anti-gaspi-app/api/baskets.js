@@ -5,12 +5,21 @@ import apiClient from './client';
  * @param {number} lat - User latitude
  * @param {number} lng - User longitude
  * @param {number} radius - Search radius in km (default: 5)
- * @returns {Promise} API response with baskets array
+ * @returns {Promise} API response with shops array
  */
 export const searchBaskets = async (lat, lng, radius = 5) => {
     const response = await apiClient.get('/baskets', {
         params: { lat, lng, radius },
     });
+    return response.data;
+};
+
+/**
+ * Get merchant's own baskets
+ * @returns {Promise} API response with baskets array
+ */
+export const getMerchantBaskets = async () => {
+    const response = await apiClient.get('/baskets/merchant');
     return response.data;
 };
 

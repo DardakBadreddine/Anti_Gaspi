@@ -18,6 +18,38 @@ export const requestLocationPermission = async () => {
  * Get current user location
  * @returns {Promise<Object>} Location object with latitude and longitude
  */
+/**
+ * Get address from coordinates
+ * @param {number} latitude 
+ * @param {number} longitude 
+ * @returns {Promise<string>} Formatted address or null
+ */
+export const getAddressFromCoordinates = async (latitude, longitude) => {
+    try {
+        const hasPermission = await requestLocationPermission();
+        if (!hasPermission) return null;
+
+        const result = await Location.reverseGeocodeAsync({ latitude, longitude });
+
+        if (result && result.length > 0) {
+            const { street, city, region, postalCode, country } = result[0];
+            const parts = [
+                street,
+                postalCode,
+                city,
+                // region, // Often too verbose or duplicate
+                // country // Assumed local for now
+            ].filter(part => part); // Remove null/undefined
+
+            return parts.join(', ');
+        }
+        return null;
+    } catch (error) {
+        console.error('Error reverse geocoding:', error);
+        return null;
+    }
+};
+
 export const getCurrentLocation = async () => {
     try {
         const hasPermission = await requestLocationPermission();

@@ -41,4 +41,25 @@ function requireCustomer(req, res, next) {
     next();
 }
 
-module.exports = { authenticate, requireMerchant, requireCustomer };
+/**
+ * Middleware to check if user is authenticated (without erroring)
+ */
+function tryAuthenticate(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return next();
+    }
+
+    const token = authHeader.substring(7);
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+    } catch (error) {
+        // Ignore error
+    }
+    next();
+}
+
+module.exports = { authenticate, requireMerchant, requireCustomer, tryAuthenticate };

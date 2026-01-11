@@ -6,6 +6,8 @@ const { initializeDatabase } = require('./database/init');
 const createAuthRoutes = require('./routes/auth');
 const { createBasketRoutes, startBasketCleanup } = require('./routes/baskets');
 const createReservationRoutes = require('./routes/reservations');
+const createFavoritesRoutes = require('./routes/favorites');
+const createPushTokenRoutes = require('./routes/push_tokens');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +32,8 @@ const db = initializeDatabase(dbPath);
 app.use('/api/auth', createAuthRoutes(db));
 app.use('/api/baskets', createBasketRoutes(db));
 app.use('/api/reservations', createReservationRoutes(db));
+app.use('/api/favorites', createFavoritesRoutes(db));
+app.use('/api/push-tokens', createPushTokenRoutes(db));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -50,12 +54,12 @@ app.use((err, req, res, next) => {
 // Start basket cleanup task
 startBasketCleanup(db);
 
-// Start server
+// Start server - bind to all network interfaces
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 Anti-Gaspi API Server`);
+    console.log(`🚀 Anti-Gaspi API Server`);
     console.log(`📡 Server running on http://localhost:${PORT}`);
-    console.log(`🗄️  Database: ${dbPath}`);
-    console.log(`⏰ Basket cleanup task started\n`);
+    console.log(`📡 Accessible from network on http://0.0.0.0:${PORT}`);
+    console.log(`🗄️  Database: ./database/antigaspi.db`);
 });
 
 // Graceful shutdown

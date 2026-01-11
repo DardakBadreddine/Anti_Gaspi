@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,16 +7,18 @@ import {
     RefreshControl,
     Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { getMerchantReservations } from '../../api/reservations';
-import ProfileHeaderButton from '../../components/ProfileHeaderButton';
 
 const MerchantReservationsScreen = () => {
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        loadReservations();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            loadReservations();
+        }, [])
+    );
 
     const loadReservations = async () => {
         setLoading(true);
@@ -84,7 +86,6 @@ const MerchantReservationsScreen = () => {
                             {reservations.filter(r => r.status === 'pending').length} en attente
                         </Text>
                     </View>
-                    <ProfileHeaderButton />
                 </View>
             </View>
 

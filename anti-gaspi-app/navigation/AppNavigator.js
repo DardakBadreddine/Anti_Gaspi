@@ -4,7 +4,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 // Auth screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -14,37 +16,44 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import SearchScreen from '../screens/customer/SearchScreen';
 import BasketDetailsScreen from '../screens/customer/BasketDetailsScreen';
 import ReservationsScreen from '../screens/customer/ReservationsScreen';
+import ReservationDetailScreen from '../screens/customer/ReservationDetailScreen';
+import FavoritesScreen from '../screens/customer/FavoritesScreen';
+import MapScreen from '../screens/customer/MapScreen';
+import ShopDetailScreen from '../screens/customer/ShopDetailScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 // Merchant screens
 import AddBasketScreen from '../screens/merchant/AddBasketScreen';
 import MerchantBasketsScreen from '../screens/merchant/MerchantBasketsScreen';
 import ScannerScreen from '../screens/merchant/ScannerScreen';
 import MerchantReservationsScreen from '../screens/merchant/MerchantReservationsScreen';
-import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Customer Tab Navigator
 const CustomerTabs = () => {
+    const insets = useSafeAreaInsets();
+
     return (
         <Tab.Navigator
             screenOptions={{
                 headerShown: false,
                 tabBarActiveTintColor: '#22c55e',
-                tabBarInactiveTintColor: '#9ca3af',
+                tabBarInactiveTintColor: '#8E8E93',
                 tabBarStyle: {
                     backgroundColor: '#fff',
-                    borderTopWidth: 1,
-                    borderTopColor: '#f3f4f6',
-                    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+                    borderTopWidth: 0,
+                    paddingBottom: Math.max(insets.bottom, 8),
                     paddingTop: 10,
-                    height: Platform.OS === 'ios' ? 85 : 70,
+                    height: 60 + Math.max(insets.bottom, 8),
+                    elevation: 0,
+                    shadowOpacity: 0,
                 },
                 tabBarLabelStyle: {
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: '500',
-                    marginBottom: Platform.OS === 'ios' ? 0 : 5,
+                    marginBottom: 2,
                 }
             }}
         >
@@ -52,9 +61,19 @@ const CustomerTabs = () => {
                 name="Search"
                 component={SearchScreen}
                 options={{
-                    tabBarLabel: 'Rechercher',
+                    tabBarLabel: 'Accueil',
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="search" size={size} color={color} />
+                        <Ionicons name="home" size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="Favorites"
+                component={FavoritesScreen}
+                options={{
+                    tabBarLabel: 'Favoris',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="heart" size={size} color={color} />
                     ),
                 }}
             />
@@ -62,9 +81,29 @@ const CustomerTabs = () => {
                 name="Reservations"
                 component={ReservationsScreen}
                 options={{
-                    tabBarLabel: 'Mes Réservations',
+                    tabBarLabel: 'Réservations',
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="list" size={size} color={color} />
+                        <Ionicons name="receipt" size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="Map"
+                component={MapScreen}
+                options={{
+                    tabBarLabel: 'Carte',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="map" size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="Profile"
+                component={ProfileScreen}
+                options={{
+                    tabBarLabel: 'Profil',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="person" size={size} color={color} />
                     ),
                 }}
             />
@@ -74,24 +113,27 @@ const CustomerTabs = () => {
 
 // Merchant Tab Navigator
 const MerchantTabs = () => {
+    const insets = useSafeAreaInsets();
+
     return (
         <Tab.Navigator
             screenOptions={{
                 headerShown: false,
                 tabBarActiveTintColor: '#22c55e',
-                tabBarInactiveTintColor: '#9ca3af',
+                tabBarInactiveTintColor: '#8E8E93',
                 tabBarStyle: {
                     backgroundColor: '#fff',
-                    borderTopWidth: 1,
-                    borderTopColor: '#f3f4f6',
-                    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+                    borderTopWidth: 0,
+                    paddingBottom: Math.max(insets.bottom, 8),
                     paddingTop: 10,
-                    height: Platform.OS === 'ios' ? 85 : 70,
+                    height: 60 + Math.max(insets.bottom, 8),
+                    elevation: 0,
+                    shadowOpacity: 0,
                 },
                 tabBarLabelStyle: {
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: '500',
-                    marginBottom: Platform.OS === 'ios' ? 0 : 5,
+                    marginBottom: 2,
                 }
             }}
         >
@@ -121,7 +163,17 @@ const MerchantTabs = () => {
                 options={{
                     tabBarLabel: 'Réservations',
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="clipboard" size={size} color={color} />
+                        <Ionicons name="receipt" size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="Profile"
+                component={ProfileScreen}
+                options={{
+                    tabBarLabel: 'Profil',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="person" size={size} color={color} />
                     ),
                 }}
             />
@@ -132,6 +184,7 @@ const MerchantTabs = () => {
 // Main App Navigator
 const AppNavigator = () => {
     const { user, isAuthenticated, loading } = useAuth();
+    usePushNotifications();
 
     if (loading) {
         return null; // Or a loading screen
@@ -147,22 +200,11 @@ const AppNavigator = () => {
                 </Stack.Navigator>
             ) : user?.role === 'customer' ? (
                 // Customer Stack
-                <Stack.Navigator>
-                    <Stack.Screen
-                        name="CustomerHome"
-                        component={CustomerTabs}
-                        options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                        name="BasketDetails"
-                        component={BasketDetailsScreen}
-                        options={{ title: 'Détails du panier' }}
-                    />
-                    <Stack.Screen
-                        name="Profile"
-                        component={ProfileScreen}
-                        options={{ title: 'Mon Profil' }}
-                    />
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="CustomerTabs" component={CustomerTabs} />
+                    <Stack.Screen name="ShopDetail" component={ShopDetailScreen} />
+                    <Stack.Screen name="BasketDetails" component={BasketDetailsScreen} />
+                    <Stack.Screen name="ReservationDetail" component={ReservationDetailScreen} />
                 </Stack.Navigator>
             ) : (
                 // Merchant Stack
@@ -183,8 +225,9 @@ const AppNavigator = () => {
                         options={{ title: 'Mon Profil' }}
                     />
                 </Stack.Navigator>
-            )}
-        </NavigationContainer>
+            )
+            }
+        </NavigationContainer >
     );
 };
 

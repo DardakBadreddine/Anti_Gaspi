@@ -40,7 +40,7 @@ const BasketDetailsScreen = ({ route, navigation }) => {
     const loadBasketDetails = async () => {
         try {
             const result = await getBasketDetails(basketId);
-            setBasket(result.basket);
+            setBasket(result);
         } catch (error) {
             Alert.alert('Erreur', 'Impossible de charger les détails du panier');
             navigation.goBack();
@@ -49,9 +49,14 @@ const BasketDetailsScreen = ({ route, navigation }) => {
     };
 
     const handleReserve = async () => {
+        const date = new Date(basket.expires_at);
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const timeStr = `${hours}h${minutes}`;
+
         Alert.alert(
             'Confirmer la réservation',
-            'Vous aurez 1 heure pour récupérer ce panier. Le paiement se fait sur place.',
+            `Vous avez jusqu'à ${timeStr} pour récupérer ce panier. Le paiement se fait sur place.`,
             [
                 { text: 'Annuler', style: 'cancel' },
                 {
@@ -60,16 +65,10 @@ const BasketDetailsScreen = ({ route, navigation }) => {
                         setReserving(true);
                         try {
                             await createReservation(basketId);
+                            loadBasketDetails(); // Refresh immediately
                             Alert.alert(
                                 'Félicitations ! 🎉',
-                                'Votre panier est réservé. Retrouvez votre QR Code dans l\'onglet Réservations.',
-                                [
-                                    {
-                                        text: 'Voir mon QR Code',
-                                        // FIX: Navigate to nested screen
-                                        onPress: () => navigation.navigate('CustomerHome', { screen: 'Reservations' }),
-                                    },
-                                ]
+                                'Votre panier est réservé. Retrouvez votre QR Code dans l\'onglet Réservations.'
                             );
                         } catch (error) {
                             const errorMsg =
@@ -131,16 +130,19 @@ const BasketDetailsScreen = ({ route, navigation }) => {
                     <View style={styles.divider} />
 
                     {/* Price & Value */}
-                    <View style={styles.priceRow}>
+                    <View style={styles.priceContainer}>
                         <View>
-                            <Text style={styles.priceLabel}>Prix à payer</Text>
-                            <Text style={styles.bigPrice}>{basket.discounted_price.toFixed(2)} €</Text>
-                        </View>
-                        <View style={styles.valueBox}>
-                            <Text style={styles.originalPrice}>Valeur: {basket.original_price.toFixed(2)} €</Text>
-                            <View style={styles.saveBadge}>
-                                <Text style={styles.saveText}>Économie -{discount}%</Text>
+                            <View style={styles.priceWrapper}>
+                                <Text style={styles.bigPrice}>{(basket.discounted_price || 0).toFixed(2)} €</Text>
+                                <View style={styles.discountBadge}>
+                                    <Text style={styles.discountText}>
+                                        -{Math.round(((basket.original_price - basket.discounted_price) / basket.original_price) * 100)}%
+                                    </Text>
+                                </View>
                             </View>
+                            {basket.original_price && (
+                                <Text style={styles.originalPrice}>Valeur: {Number(basket.original_price).toFixed(2)} €</Text>
+                            )}
                         </View>
                     </View>
 
@@ -176,7 +178,7 @@ const BasketDetailsScreen = ({ route, navigation }) => {
             {/* Sticky Bottom Button */}
             <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
                 <Button
-                    title={`Réserver pour ${basket.discounted_price.toFixed(2)} €`}
+                    title={`Réserver pour ${(basket.discounted_price || 0).toFixed(2)} €`}
                     onPress={handleReserve}
                     loading={reserving}
                     disabled={basket.available_quantity <= 0}

@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS merchants (
   business_name TEXT NOT NULL,
   description TEXT,
   phone TEXT,
+  logo_url TEXT,
+  rating REAL DEFAULT 0,
+  tagline TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -33,6 +36,7 @@ CREATE TABLE IF NOT EXISTS baskets (
   original_price REAL NOT NULL,
   discounted_price REAL NOT NULL,
   quantity INTEGER NOT NULL DEFAULT 1,
+  visible BOOLEAN DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   expires_at DATETIME NOT NULL,
   FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE
@@ -51,10 +55,35 @@ CREATE TABLE IF NOT EXISTS reservations (
   FOREIGN KEY (basket_id) REFERENCES baskets(id) ON DELETE CASCADE
 );
 
+-- Favorites table (shop/merchant favorites)
+CREATE TABLE IF NOT EXISTS favorites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  merchant_id INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (merchant_id) REFERENCES merchants(id) ON DELETE CASCADE,
+  UNIQUE(user_id, merchant_id)
+);
+
+-- Push notification tokens
+CREATE TABLE IF NOT EXISTS push_tokens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  token TEXT NOT NULL,
+  platform TEXT CHECK(platform IN ('android', 'ios')),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_location ON users(latitude, longitude);
 CREATE INDEX IF NOT EXISTS idx_baskets_expires ON baskets(expires_at);
 CREATE INDEX IF NOT EXISTS idx_baskets_merchant ON baskets(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_baskets_visible ON baskets(visible);
 CREATE INDEX IF NOT EXISTS idx_reservations_user ON reservations(user_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_basket ON reservations(basket_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_qr ON reservations(qr_code);
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_merchant ON favorites(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id);

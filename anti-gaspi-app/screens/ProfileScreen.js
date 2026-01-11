@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -7,97 +7,92 @@ import {
     KeyboardAvoidingView,
     Platform,
     Alert,
+    TouchableOpacity,
+    Modal,
+    TextInput,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/Button';
 import Input from '../components/Input';
-import { getCurrentLocation } from '../utils/location';
+import LocationPicker from '../components/LocationPicker';
+import { getAddressFromCoordinates } from '../utils/location';
 
 const ProfileScreen = ({ navigation }) => {
-    const { user, update, deleteAccount } = useAuth();
+    const { user, logout, update, deleteAccount } = useAuth();
+    const insets = useSafeAreaInsets();
     const [loading, setLoading] = useState(false);
+    const [editing, setEditing] = useState(false);
 
-    // Form state
+    // Delete account modal
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+    // Form state - editable fields
     const [name, setName] = useState(user?.name || '');
     const [email, setEmail] = useState(user?.email || '');
-    const [password, setPassword] = useState(''); // Only if changing
-    const [address, setAddress] = useState(user?.address || '');
-    const [businessName, setBusinessName] = useState(user?.business_name || '');
-    const [description, setDescription] = useState(user?.description || '');
     const [phone, setPhone] = useState(user?.phone || '');
-
-    // For merchant location update
+    const [address, setAddress] = useState(user?.address || '');
     const [location, setLocation] = useState({
         latitude: user?.latitude,
         longitude: user?.longitude
     });
-    const [locationLoading, setLocationLoading] = useState(false);
 
-    const handleGetLocation = async () => {
-        setLocationLoading(true);
-        try {
-            const loc = await getCurrentLocation();
-            setLocation(loc);
-            Alert.alert('Succès', 'Position mise à jour');
-        } catch (error) {
-            Alert.alert('Erreur', 'Impossible de récupérer votre position');
-        }
-        setLocationLoading(false);
-    };
-
-    const handleUpdate = async () => {
+    const handleSave = async () => {
         setLoading(true);
 
-        const updateData = {
+        const result = await update({
             name,
             email,
-        };
+            phone,
+            address,
+            latitude: location?.latitude,
+            longitude: location?.longitude,
+        });
 
-        if (password) updateData.password = password;
-        if (address) updateData.address = address;
-
-        if (user.role === 'merchant') {
-            updateData.businessName = businessName;
-            updateData.description = description;
-            updateData.phone = phone;
-            if (location) {
-                updateData.latitude = location.latitude;
-                updateData.longitude = location.longitude;
-            }
-        }
-
-        const result = await update(updateData);
         setLoading(false);
 
         if (result.success) {
-            Alert.alert('Succès', 'Profil mis à jour avec succès', [
-                { text: 'OK', onPress: () => setPassword('') } // Clear password field
-            ]);
+            Alert.alert('Succès', 'Profil mis à jour avec succès');
+            setEditing(false);
         } else {
-            Alert.alert('Erreur', result.error);
+            Alert.alert('Erreur', result.error || 'Impossible de mettre à jour le profil');
         }
     };
 
-    const handleDelete = () => {
+    const handleLogout = () => {
         Alert.alert(
-            'Supprimer le compte',
-            'Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible et effacera toutes vos données.',
+            'Déconnexion',
+            'Voulez-vous vraiment vous déconnecter?',
             [
                 { text: 'Annuler', style: 'cancel' },
                 {
-                    text: 'Supprimer',
+                    text: 'Déconnexion',
                     style: 'destructive',
                     onPress: async () => {
-                        setLoading(true);
-                        const result = await deleteAccount();
-                        if (!result.success) {
-                            setLoading(false);
-                            Alert.alert('Erreur', result.error);
-                        }
+                        await logout();
                     }
                 }
             ]
         );
+    };
+
+    const handleDeleteAccount = async () => {
+        if (deleteConfirmText !== 'SUPPRIMER') {
+            Alert.alert('Erreur', 'Veuillez taper "SUPPRIMER" pour confirmer');
+            return;
+        }
+
+        setLoading(true);
+        const result = await deleteAccount();
+        setLoading(false);
+        setShowDeleteModal(false);
+        setDeleteConfirmText('');
+
+        if (!result.success) {
+            Alert.alert('Erreur', result.error || 'Impossible de supprimer le compte');
+        }
     };
 
     return (
@@ -105,14 +100,49 @@ const ProfileScreen = ({ navigation }) => {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    {
+                        paddingBottom: insets.bottom + 24,
+                        paddingTop: insets.top + 20
+                    }
+                ]}
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <View style={styles.avatarContainer}>
+                        <Ionicons
+                            name={user?.role === 'merchant' ? 'storefront' : 'person'}
+                            size={48}
+                            color="#22c55e"
+                        />
+                    </View>
+                    <Text style={styles.userName}>{user?.name}</Text>
+                    <Text style={styles.userEmail}>{user?.email}</Text>
+                    <View style={styles.roleBadge}>
+                        <Text style={styles.roleText}>
+                            {user?.role === 'merchant' ? 'Commerçant' : 'Client'}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Editable Profile Fields */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Informations Personnelles</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Informations</Text>
+                        {!editing && (
+                            <TouchableOpacity onPress={() => setEditing(true)}>
+                                <Ionicons name="create-outline" size={24} color="#22c55e" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
 
                     <Input
-                        label="Nom complet"
+                        label="Nom"
                         value={name}
                         onChangeText={setName}
+                        editable={editing}
                     />
 
                     <Input
@@ -120,73 +150,150 @@ const ProfileScreen = ({ navigation }) => {
                         value={email}
                         onChangeText={setEmail}
                         keyboardType="email-address"
+                        editable={editing}
                     />
 
                     <Input
-                        label="Nouveau mot de passe (laisser vide pour conserver l'actuel)"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry={true}
-                        placeholder="••••••••"
+                        label="Téléphone"
+                        value={phone}
+                        onChangeText={setPhone}
+                        keyboardType="phone-pad"
+                        editable={editing}
                     />
+
+                    <Input
+                        label="Adresse"
+                        value={address}
+                        onChangeText={setAddress}
+                        editable={editing}
+                    />
+
+                    {editing && user?.role === 'merchant' && (
+                        <>
+                            <Text style={styles.label}>Position du commerce</Text>
+                            <LocationPicker
+                                onLocationSelect={async (loc) => {
+                                    setLocation(loc);
+                                    if (loc) {
+                                        const formattedAddress = await getAddressFromCoordinates(loc.latitude, loc.longitude);
+                                        if (formattedAddress) setAddress(formattedAddress);
+                                    }
+                                }}
+                                initialLocation={location}
+                            />
+                        </>
+                    )}
+
+                    {editing && (
+                        <View style={styles.editButtons}>
+                            <Button
+                                title="Annuler"
+                                variant="secondary"
+                                onPress={() => {
+                                    setName(user?.name || '');
+                                    setEmail(user?.email || '');
+                                    setPhone(user?.phone || '');
+                                    setAddress(user?.address || '');
+                                    setEditing(false);
+                                }}
+                                style={styles.cancelButton}
+                            />
+                            <Button
+                                title="Enregistrer"
+                                onPress={handleSave}
+                                loading={loading}
+                                style={styles.saveButton}
+                            />
+                        </View>
+                    )}
                 </View>
 
-                {user.role === 'merchant' && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Informations Commerce</Text>
+                {/* Actions */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Compte</Text>
 
-                        <Input
-                            label="Nom du commerce"
-                            value={businessName}
-                            onChangeText={setBusinessName}
-                        />
+                    <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
+                        <View style={styles.actionButtonContent}>
+                            <Ionicons name="log-out-outline" size={24} color="#000" />
+                            <Text style={styles.actionButtonText}>Déconnexion</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+                    </TouchableOpacity>
 
-                        <Input
-                            label="Adresse"
-                            value={address}
-                            onChangeText={setAddress}
-                        />
-
-                        <Button
-                            title={location?.latitude ? '📍 Position enregistrée (Mettre à jour)' : '📍 Ajouter ma position'}
-                            onPress={handleGetLocation}
-                            loading={locationLoading}
-                            variant="secondary"
-                            style={styles.locationButton}
-                        />
-
-                        <Input
-                            label="Téléphone"
-                            value={phone}
-                            onChangeText={setPhone}
-                            keyboardType="phone-pad"
-                        />
-
-                        <Input
-                            label="Description"
-                            value={description}
-                            onChangeText={setDescription}
-                            multiline={true}
-                        />
-                    </View>
-                )}
-
-                <View style={styles.footer}>
-                    <Button
-                        title="Sauvegarder les modifications"
-                        onPress={handleUpdate}
-                        loading={loading}
-                        style={styles.saveButton}
-                    />
-
-                    <Button
-                        title="Supprimer mon compte"
-                        onPress={handleDelete}
-                        variant="danger"
-                        style={styles.deleteButton}
-                    />
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.dangerButton]}
+                        onPress={() => setShowDeleteModal(true)}
+                    >
+                        <View style={styles.actionButtonContent}>
+                            <Ionicons name="trash-outline" size={24} color="#ef4444" />
+                            <Text style={[styles.actionButtonText, styles.dangerText]}>
+                                Supprimer mon compte
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#ef4444" />
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* Delete Account Modal */}
+            <Modal
+                visible={showDeleteModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowDeleteModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Ionicons name="warning" size={48} color="#ef4444" />
+                            <Text style={styles.modalTitle}>Supprimer le compte</Text>
+                        </View>
+
+                        <Text style={styles.modalText}>
+                            Cette action est <Text style={styles.boldText}>irréversible</Text>.
+                            Toutes vos données seront définitivement supprimées.
+                        </Text>
+
+                        <Text style={styles.modalText}>
+                            Tapez <Text style={styles.boldText}>SUPPRIMER</Text> pour confirmer:
+                        </Text>
+
+                        <TextInput
+                            style={styles.confirmInput}
+                            value={deleteConfirmText}
+                            onChangeText={setDeleteConfirmText}
+                            placeholder="Tapez SUPPRIMER"
+                            autoCapitalize="characters"
+                        />
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelModalButton]}
+                                onPress={() => {
+                                    setShowDeleteModal(false);
+                                    setDeleteConfirmText('');
+                                }}
+                            >
+                                <Text style={styles.cancelButtonText}>Annuler</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.modalButton,
+                                    styles.deleteButton,
+                                    deleteConfirmText !== 'SUPPRIMER' && styles.disabledButton
+                                ]}
+                                onPress={handleDeleteAccount}
+                                disabled={deleteConfirmText !== 'SUPPRIMER' || loading}
+                            >
+                                <Text style={styles.deleteButtonText}>
+                                    {loading ? 'Suppression...' : 'Supprimer'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </KeyboardAvoidingView>
     );
 };
@@ -194,40 +301,188 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f9fafb',
+        backgroundColor: '#F2F2F7',
     },
     scrollContent: {
-        padding: 24,
+        padding: 20,
+    },
+    header: {
+        alignItems: 'center',
+        paddingVertical: 32,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        marginBottom: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    avatarContainer: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        backgroundColor: '#f0fdf4',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    userName: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#000',
+        marginBottom: 4,
+    },
+    userEmail: {
+        fontSize: 16,
+        color: '#8E8E93',
+        marginBottom: 12,
+    },
+    roleBadge: {
+        backgroundColor: '#f0fdf4',
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    roleText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#22c55e',
     },
     section: {
-        marginBottom: 24,
         backgroundColor: '#fff',
         padding: 16,
         borderRadius: 16,
+        marginBottom: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 2,
         elevation: 2,
     },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1f2937',
-        marginBottom: 16,
+        color: '#000',
     },
-    locationButton: {
-        marginBottom: 16,
+    editButtons: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 16,
     },
-    footer: {
-        gap: 16,
-        marginBottom: 32,
+    cancelButton: {
+        flex: 1,
     },
     saveButton: {
-        backgroundColor: '#22c55e',
+        flex: 1,
+    },
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F2F2F7',
+    },
+    dangerButton: {
+        borderBottomWidth: 0,
+    },
+    actionButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    actionButtonText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#000',
+    },
+    dangerText: {
+        color: '#ef4444',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 24,
+    },
+    modalHeader: {
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#000',
+        marginTop: 12,
+    },
+    modalText: {
+        fontSize: 16,
+        color: '#8E8E93',
+        lineHeight: 24,
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    boldText: {
+        fontWeight: '700',
+        color: '#000',
+    },
+    confirmInput: {
+        backgroundColor: '#F2F2F7',
+        borderRadius: 12,
+        padding: 16,
+        fontSize: 16,
+        marginBottom: 24,
+        textAlign: 'center',
+        fontWeight: '600',
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    modalButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    cancelModalButton: {
+        backgroundColor: '#F2F2F7',
+    },
+    cancelButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#000',
     },
     deleteButton: {
-        marginTop: 16,
+        backgroundColor: '#ef4444',
+    },
+    disabledButton: {
+        backgroundColor: '#fca5a5',
+        opacity: 0.5,
+    },
+    deleteButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+        marginTop: 8,
     },
 });
 
