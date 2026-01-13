@@ -10,7 +10,7 @@ function createReservationRoutes(db) {
      * Create a reservation (customer only)
      * WITH QUANTITY MANAGEMENT & RACE CONDITION PREVENTION
      */
-    router.post('/', authenticate, requireCustomer, (req, res) => {
+    router.post('/', authenticate, requireCustomer, async (req, res) => {
         const { basketId } = req.body;
 
         if (!basketId) {
@@ -19,9 +19,9 @@ function createReservationRoutes(db) {
 
         try {
             // USE TRANSACTION to prevent race conditions
-            const reservation = db.transaction(() => {
+            const reservation = await db.transaction(async (txDb) => {
                 // 1. Lock basket row and check availability
-                const basket = db.prepare(`
+                const basket = await txDb.prepare(`
                     SELECT * FROM baskets WHERE id = ?
                 `).get(basketId);
 
@@ -29,20 +29,25 @@ function createReservationRoutes(db) {
                     throw new Error('Panier introuvable');
                 }
 
-                // 2. Check if expired
-                const now = new Date();
-                const expiresAt = new Date(basket.expires_at);
-
-                if (expiresAt <= now) {
+                // 2. Check if expired - use database time for consistency
+                const expirationCheck = await txDb.prepare(`
+                    SELECT 
+                        CASE WHEN expires_at <= UTC_TIMESTAMP() THEN 1 ELSE 0 END as is_expired
+                    FROM baskets 
+                    WHERE id = ?
+                `).get(basketId);
+                
+                if (!expirationCheck || expirationCheck.is_expired === 1) {
                     throw new Error('Ce panier a expiré');
                 }
 
                 // 3. Calculate current available quantity
-                const reservationCount = db.prepare(`
+                const reservationCountResult = await txDb.prepare(`
                     SELECT COUNT(*) as count 
                     FROM reservations 
                     WHERE basket_id = ? AND status = 'pending'
-                `).get(basketId).count;
+                `).get(basketId);
+                const reservationCount = reservationCountResult.count;
 
                 const availableQuantity = basket.quantity - reservationCount;
 
@@ -52,7 +57,7 @@ function createReservationRoutes(db) {
                 }
 
                 // 5. Check if user already has a reservation for this basket
-                const existingReservation = db.prepare(
+                const existingReservation = await txDb.prepare(
                     'SELECT * FROM reservations WHERE user_id = ? AND basket_id = ? AND status = ?'
                 ).get(req.user.userId, basketId, 'pending');
 
@@ -64,19 +69,19 @@ function createReservationRoutes(db) {
                 const qrCode = uuidv4();
 
                 // 7. Create reservation
-                const insertReservation = db.prepare(`
+                const insertReservation = txDb.prepare(`
                     INSERT INTO reservations (user_id, basket_id, qr_code, status)
                     VALUES (?, ?, ?, 'pending')
                 `);
 
-                const result = insertReservation.run(req.user.userId, basketId, qrCode);
+                const result = await insertReservation.run(req.user.userId, basketId, qrCode);
 
                 // 8. Check if this was the last available slot
                 const newAvailableQuantity = availableQuantity - 1;
 
                 // 9. If quantity reaches 0, hide the basket
                 if (newAvailableQuantity <= 0) {
-                    db.prepare(`
+                    await txDb.prepare(`
                         UPDATE baskets 
                         SET visible = 0 
                         WHERE id = ?
@@ -90,12 +95,12 @@ function createReservationRoutes(db) {
                     status: 'pending',
                     quantity_left: newAvailableQuantity
                 };
-            })();
+            });
 
             // Send notification to merchant
             (async () => {
                 try {
-                    const merchant = db.prepare(`
+                    const merchant = await db.prepare(`
                         SELECT m.id, m.business_name, u.id as user_id
                         FROM baskets b
                         JOIN merchants m ON b.merchant_id = m.id
@@ -104,7 +109,7 @@ function createReservationRoutes(db) {
                     `).get(basketId);
 
                     if (merchant) {
-                        const tokens = db.prepare(`
+                        const tokens = await db.prepare(`
                             SELECT token FROM push_tokens
                             WHERE user_id = ?
                         `).all(merchant.user_id);
@@ -158,9 +163,9 @@ function createReservationRoutes(db) {
      * GET /api/reservations/user
      * Get current user's reservations
      */
-    router.get('/user', authenticate, requireCustomer, (req, res) => {
+    router.get('/user', authenticate, requireCustomer, async (req, res) => {
         try {
-            const reservations = db.prepare(`
+            const reservations = await db.prepare(`
         SELECT 
           r.*,
           b.title,
@@ -192,16 +197,16 @@ function createReservationRoutes(db) {
      * GET /api/reservations/merchant
      * Get merchant's pending pickups
      */
-    router.get('/merchant', authenticate, requireMerchant, (req, res) => {
+    router.get('/merchant', authenticate, requireMerchant, async (req, res) => {
         try {
             // Get merchant ID
-            const merchant = db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(req.user.userId);
+            const merchant = await db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(req.user.userId);
 
             if (!merchant) {
                 return res.status(403).json({ error: 'Profil commerçant introuvable' });
             }
 
-            const reservations = db.prepare(`
+            const reservations = await db.prepare(`
         SELECT 
           r.*,
           b.title,
@@ -227,7 +232,7 @@ function createReservationRoutes(db) {
      * POST /api/reservations/validate
      * Validate QR code and mark reservation as collected (merchant only)
      */
-    router.post('/validate', authenticate, requireMerchant, (req, res) => {
+    router.post('/validate', authenticate, requireMerchant, async (req, res) => {
         const { qrCode } = req.body;
 
         if (!qrCode) {
@@ -236,14 +241,14 @@ function createReservationRoutes(db) {
 
         try {
             // Get merchant ID
-            const merchant = db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(req.user.userId);
+            const merchant = await db.prepare('SELECT id FROM merchants WHERE user_id = ?').get(req.user.userId);
 
             if (!merchant) {
                 return res.status(403).json({ error: 'Profil commerçant introuvable' });
             }
 
             // Find reservation
-            const reservation = db.prepare(`
+            const reservation = await db.prepare(`
         SELECT r.*, b.merchant_id
         FROM reservations r
         JOIN baskets b ON r.basket_id = b.id
@@ -265,11 +270,11 @@ function createReservationRoutes(db) {
             }
 
             // USE TRANSACTION
-            const updatedReservation = db.transaction(() => {
+            const updatedReservation = await db.transaction(async (txDb) => {
                 const now = new Date().toISOString();
 
                 // 1. Update reservation status
-                db.prepare(`
+                await txDb.prepare(`
                     UPDATE reservations 
                     SET status = 'collected', collected_at = ?
                     WHERE id = ?
@@ -277,7 +282,7 @@ function createReservationRoutes(db) {
 
                 // 2. Decrement basket quantity to reflect permanent removal from stock
                 // This ensures available_quantity (quantity - pending) remains correct
-                db.prepare(`
+                await txDb.prepare(`
                     UPDATE baskets
                     SET quantity = quantity - 1
                     WHERE id = ?
@@ -288,12 +293,12 @@ function createReservationRoutes(db) {
                     status: 'collected',
                     collected_at: now
                 };
-            })();
+            });
 
             // Send notification to customer
             (async () => {
                 try {
-                    const tokens = db.prepare(`
+                    const tokens = await db.prepare(`
                         SELECT token FROM push_tokens
                         WHERE user_id = ?
                     `).all(reservation.user_id);
@@ -337,23 +342,22 @@ function createReservationRoutes(db) {
      * PATCH /api/reservations/:id/cancel
      * Cancel a reservation (customer only)
      */
-    router.patch('/:id/cancel', authenticate, requireCustomer, (req, res) => {
+    router.patch('/:id/cancel', authenticate, requireCustomer, async (req, res) => {
         try {
-            const runTransaction = db.transaction(() => {
-                const reservation = db.prepare('SELECT basket_id FROM reservations WHERE id = ? AND user_id = ? AND status = ?').get(req.params.id, req.user.userId, 'pending');
+            await db.transaction(async (txDb) => {
+                const reservation = await txDb.prepare('SELECT basket_id FROM reservations WHERE id = ? AND user_id = ? AND status = ?').get(req.params.id, req.user.userId, 'pending');
 
                 if (!reservation) {
                     throw new Error('Réservation introuvable ou déjà traitée');
                 }
 
                 // Update status
-                db.prepare("UPDATE reservations SET status = 'cancelled' WHERE id = ?").run(req.params.id);
+                await txDb.prepare("UPDATE reservations SET status = 'cancelled' WHERE id = ?").run(req.params.id);
 
                 // Re-enable visibility just in case it was hidden (this fixes the "0 available" bug)
-                db.prepare("UPDATE baskets SET visible = 1 WHERE id = ?").run(reservation.basket_id);
+                await txDb.prepare("UPDATE baskets SET visible = 1 WHERE id = ?").run(reservation.basket_id);
             });
 
-            runTransaction();
             res.json({ message: 'Réservation annulée' });
         } catch (error) {
             if (error.message === 'Réservation introuvable ou déjà traitée') {

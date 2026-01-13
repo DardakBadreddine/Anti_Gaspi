@@ -62,7 +62,7 @@ const MerchantReservationsScreen = () => {
                 </View>
 
                 <View style={styles.footer}>
-                    <Text style={styles.price}>€{item.discounted_price.toFixed(2)}</Text>
+                    <Text style={styles.price}>€{Number(item.discounted_price || 0).toFixed(2)}</Text>
                     <Text style={styles.date}>
                         {new Date(item.reserved_at).toLocaleDateString('fr-FR', {
                             day: 'numeric',

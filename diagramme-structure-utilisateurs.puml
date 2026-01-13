@@ -1,0 +1,113 @@
+@startuml Structure des Composants - Client vs Commerçant
+
+skinparam component {
+    BackgroundColor #FFFFFF
+    BorderColor #1f2937
+    FontSize 11
+}
+
+skinparam package {
+    BackgroundColor #f3f4f6
+    BorderColor #6b7280
+}
+
+package "App.js" {
+    component [App] as App
+    component [AuthProvider] as AuthProvider
+    component [AppNavigator] as Navigator
+}
+
+package "Contexts" {
+    component [AuthContext] as AuthContext {
+        user.role
+        isAuthenticated
+    }
+}
+
+package "Navigation" {
+    component [AppNavigator] as Nav {
+        Décision: user.role === 'customer' ?
+    }
+}
+
+package "CLIENT (customer)" #lightblue {
+    package "Onglets" {
+        component [SearchScreen] as CSearch
+        component [FavoritesScreen] as CFav
+        component [ReservationsScreen] as CRes
+        component [MapScreen] as CMap
+        component [ProfileScreen] as CProfile
+    }
+    
+    package "Stack Screens" {
+        component [ShopDetailScreen] as CShop
+        component [BasketDetailsScreen] as CBasket
+        component [ReservationDetailScreen] as CResDetail
+        component [ReviewScreen] as CReview
+    }
+}
+
+package "COMMERÇANT (merchant)" #lightgreen {
+    package "Onglets" {
+        component [MerchantBasketsScreen] as MBaskets
+        component [ScannerScreen] as MScanner
+        component [MerchantReservationsScreen] as MRes
+        component [ProfileScreen] as MProfile
+    }
+    
+    package "Stack Screens" {
+        component [AddBasketScreen] as MAddBasket
+    }
+}
+
+package "Partagé" #lightyellow {
+    component [LoginScreen] as Login
+    component [RegisterScreen] as Register
+    component [OnboardingScreen] as Onboarding
+}
+
+' Relations
+App --> AuthProvider
+AuthProvider --> Navigator
+Navigator --> AuthContext
+AuthContext --> Navigator : user.role
+
+Navigator --> CSearch : if role='customer'
+Navigator --> CFav : if role='customer'
+Navigator --> CRes : if role='customer'
+Navigator --> CMap : if role='customer'
+Navigator --> CProfile : if role='customer'
+Navigator --> CShop : if role='customer'
+Navigator --> CBasket : if role='customer'
+Navigator --> CResDetail : if role='customer'
+Navigator --> CReview : if role='customer'
+
+Navigator --> MBaskets : if role='merchant'
+Navigator --> MScanner : if role='merchant'
+Navigator --> MRes : if role='merchant'
+Navigator --> MProfile : if role='merchant'
+Navigator --> MAddBasket : if role='merchant'
+
+Navigator --> Login : if not authenticated
+Navigator --> Register : if not authenticated
+Navigator --> Onboarding : first launch
+
+note right of Navigator
+  Ligne 224 dans AppNavigator.js:
+  
+  user?.role === 'customer' ?
+    → CustomerTabs + Stack
+  : else
+    → MerchantTabs + Stack
+end note
+
+note right of AuthContext
+  Fournit:
+  - user.role
+  - isAuthenticated
+  - token
+  - login()
+  - logout()
+end note
+
+@enduml

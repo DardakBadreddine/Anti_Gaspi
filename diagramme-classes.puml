@@ -1,0 +1,85 @@
+@startuml Diagramme de Classes - Plateforme Anti-Gaspi
+
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor #1f2937
+    ArrowColor #22c55e
+    FontSize 12
+}
+
+class Utilisateur {
+    - id: Integer
+    - email: String
+    - password: String
+    - role: String
+    - name: String
+    - address: String
+    - latitude: Real
+    - longitude: Real
+}
+
+class Commerçant {
+    - id: Integer
+    - user_id: Integer
+    - business_name: String
+    - description: String
+    - phone: String
+    - rating: Real
+}
+
+class Panier {
+    - id: Integer
+    - merchant_id: Integer
+    - title: String
+    - description: String
+    - original_price: Real
+    - discounted_price: Real
+    - quantity: Integer
+    - expires_at: DateTime
+}
+
+class Réservation {
+    - id: Integer
+    - user_id: Integer
+    - basket_id: Integer
+    - qr_code: String
+    - status: String
+    - reserved_at: DateTime
+}
+
+class Catégorie {
+    - id: Integer
+    - name: String
+    - icon: String
+}
+
+class Favori {
+    - id: Integer
+    - user_id: Integer
+    - merchant_id: Integer
+}
+
+class Avis {
+    - id: Integer
+    - user_id: Integer
+    - merchant_id: Integer
+    - rating: Integer
+    - comment: String
+}
+
+' Relations
+Utilisateur ||--o{ Commerçant
+Utilisateur ||--o{ Réservation
+Utilisateur ||--o{ Favori
+Utilisateur ||--o{ Avis
+
+Commerçant ||--o{ Panier
+Commerçant ||--o{ Avis
+Commerçant ||--o{ Favori
+
+Panier ||--o{ Réservation
+Panier }o--o{ Catégorie
+
+Réservation ||--o| Avis
+
+@enduml

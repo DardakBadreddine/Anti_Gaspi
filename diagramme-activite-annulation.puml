@@ -1,0 +1,30 @@
+@startuml Diagramme d'Activité - Processus d'Annulation de Réservation
+
+skinparam activity {
+    BackgroundColor #FFFFFF
+    BorderColor #1f2937
+    FontSize 12
+}
+
+start
+
+:Client accède aux réservations;
+:Charger liste des réservations;
+
+if (Réservation trouvée ?) then (non)
+    stop
+else (oui)
+    :Sélectionner une réservation;
+endif
+
+if (Réservation annulable ?) then (non)
+    stop
+else (oui)
+    :Confirmer annulation;
+    :Annuler réservation;
+    :Mettre à jour statut;
+endif
+
+stop
+
+@enduml

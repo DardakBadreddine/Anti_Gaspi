@@ -14,9 +14,11 @@ const FOOD_IMAGES = [
 ];
 
 const BasketCard = ({ basket, onPress, showMerchantInfo = true }) => {
-    const discount = Math.round(
-        ((basket.original_price - basket.discounted_price) / basket.original_price) * 100
-    );
+    const discount = basket.original_price && basket.original_price > 0
+        ? Math.round(
+            ((basket.original_price - basket.discounted_price) / basket.original_price) * 100
+        )
+        : 0;
 
     // Use uploaded image if available (supports both data URI and regular URL), otherwise fallback to placeholder
     const imageUri = basket.image_url 
@@ -108,11 +110,13 @@ const BasketCard = ({ basket, onPress, showMerchantInfo = true }) => {
                     <View style={styles.priceBlock}>
                         <View style={styles.priceLeft}>
                             <Text style={styles.discountedPrice}>
-                                {basket.discounted_price.toFixed(2)} €
+                                {Number(basket.discounted_price || 0).toFixed(2)} €
                             </Text>
-                            <Text style={styles.originalPrice}>
-                                {basket.original_price.toFixed(2)} €
-                            </Text>
+                            {basket.original_price && (
+                                <Text style={styles.originalPrice}>
+                                    {Number(basket.original_price).toFixed(2)} €
+                                </Text>
+                            )}
                         </View>
                     </View>
 

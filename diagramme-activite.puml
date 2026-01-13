@@ -1,0 +1,48 @@
+@startuml Diagramme d'Activité - Processus de Réservation de Panier
+
+skinparam activity {
+    BackgroundColor #FFFFFF
+    BorderColor #1f2937
+    FontSize 12
+}
+
+start
+
+:Client ouvre l'application;
+
+if (Utilisateur authentifié ?) then (non)
+    :Connexion;
+    stop
+else (oui)
+endif
+
+:Rechercher paniers disponibles;
+:Obtenir position GPS;
+
+if (Paniers trouvés ?) then (non)
+    stop
+else (oui)
+    :Sélectionner un panier;
+    :Afficher détails;
+endif
+
+if (Panier disponible ?) then (non)
+    stop
+else (oui)
+    :Réserver le panier;
+    :Générer QR code;
+    :Enregistrer réservation;
+endif
+
+:Commerçant scanne QR code;
+
+if (QR code valide ?) then (non)
+    stop
+else (oui)
+    :Valider réservation;
+    :Mettre à jour statut;
+endif
+
+stop
+
+@enduml

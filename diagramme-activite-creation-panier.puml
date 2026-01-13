@@ -1,0 +1,42 @@
+@startuml Diagramme d'Activité - Processus de Création de Panier (Commerçant)
+
+skinparam activity {
+    BackgroundColor #FFFFFF
+    BorderColor #1f2937
+    FontSize 12
+}
+
+start
+
+:Commerçant ouvre l'application;
+
+if (Commerçant authentifié ?) then (non)
+    stop
+else (oui)
+    :Accéder à "Mes Paniers";
+    :Cliquer sur "Ajouter un Panier";
+endif
+
+:Saisir informations du panier;
+:Saisir prix et quantité;
+:Sélectionner date d'expiration;
+
+if (Données valides ?) then (non)
+    stop
+else (oui)
+    :Ajouter image (optionnel);
+    :Sélectionner catégories;
+endif
+
+:Envoyer requête de création;
+
+if (Création réussie ?) then (non)
+    stop
+else (oui)
+    :Enregistrer panier;
+    :Afficher confirmation;
+endif
+
+stop
+
+@enduml

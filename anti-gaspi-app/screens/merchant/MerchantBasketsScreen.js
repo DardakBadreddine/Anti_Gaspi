@@ -65,9 +65,11 @@ const MerchantBasketsScreen = ({ navigation }) => {
     };
 
     const renderBasket = ({ item }) => {
-        const discount = Math.round(
-            ((item.original_price - item.discounted_price) / item.original_price) * 100
-        );
+        const discount = item.original_price && item.original_price > 0
+            ? Math.round(
+                ((item.original_price - item.discounted_price) / item.original_price) * 100
+            )
+            : 0;
 
         return (
             <View style={styles.card}>
@@ -86,8 +88,10 @@ const MerchantBasketsScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.priceContainer}>
-                    <Text style={styles.originalPrice}>€{item.original_price.toFixed(2)}</Text>
-                    <Text style={styles.discountedPrice}>€{item.discounted_price.toFixed(2)}</Text>
+                    {item.original_price && (
+                        <Text style={styles.originalPrice}>€{Number(item.original_price).toFixed(2)}</Text>
+                    )}
+                    <Text style={styles.discountedPrice}>€{Number(item.discounted_price || 0).toFixed(2)}</Text>
                     <View style={styles.discountBadge}>
                         <Text style={styles.discountText}>-{discount}%</Text>
                     </View>

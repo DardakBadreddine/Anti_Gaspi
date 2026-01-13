@@ -26,7 +26,7 @@ function createAuthRoutes(db) {
 
             try {
                 // Check if user already exists
-                const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+                const existingUser = await db.prepare('SELECT id FROM users WHERE email = ?').get(email);
                 if (existingUser) {
                     return res.status(400).json({ error: 'Cet email est déjà utilisé' });
                 }
@@ -38,7 +38,17 @@ function createAuthRoutes(db) {
                 const insertUser = db.prepare(
                     'INSERT INTO users (email, password, role, name, address, latitude, longitude, phone, profile_image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
                 );
-                const result = insertUser.run(
+                // Format profile image if provided
+                let profileImage = null;
+                if (profileImageBase64 && profileImageBase64.trim() !== '') {
+                    if (!profileImageBase64.startsWith('data:')) {
+                        profileImage = `data:image/jpeg;base64,${profileImageBase64}`;
+                    } else {
+                        profileImage = profileImageBase64;
+                    }
+                }
+                
+                const result = await insertUser.run(
                     email, 
                     hashedPassword, 
                     role, 
@@ -47,29 +57,48 @@ function createAuthRoutes(db) {
                     latitude || null, 
                     longitude || null,
                     phone || null,
-                    profileImageBase64 || null
+                    profileImage
                 );
                 const userId = result.lastInsertRowid;
 
                 // If merchant, insert merchant details
                 if (role === 'merchant') {
+                    // Format images if provided
+                    let coverImage = null;
+                    if (coverImageBase64 && coverImageBase64.trim() !== '') {
+                        if (!coverImageBase64.startsWith('data:')) {
+                            coverImage = `data:image/jpeg;base64,${coverImageBase64}`;
+                        } else {
+                            coverImage = coverImageBase64;
+                        }
+                    }
+                    
+                    let logoImage = null;
+                    if (logoImageBase64 && logoImageBase64.trim() !== '') {
+                        if (!logoImageBase64.startsWith('data:')) {
+                            logoImage = `data:image/jpeg;base64,${logoImageBase64}`;
+                        } else {
+                            logoImage = logoImageBase64;
+                        }
+                    }
+                    
                     const insertMerchant = db.prepare(
                         'INSERT INTO merchants (user_id, business_name, description, phone, cover_image_url, logo_url) VALUES (?, ?, ?, ?, ?, ?)'
                     );
-                    insertMerchant.run(
+                    await insertMerchant.run(
                         userId, 
                         businessName || name, 
                         description || null, 
                         phone || null,
-                        coverImageBase64 || null,
-                        logoImageBase64 || null
+                        coverImage,
+                        logoImage
                     );
                 }
 
                 // Get merchant details if merchant
                 let merchantData = null;
                 if (role === 'merchant') {
-                    const merchant = db.prepare('SELECT * FROM merchants WHERE user_id = ?').get(userId);
+                    const merchant = await db.prepare('SELECT * FROM merchants WHERE user_id = ?').get(userId);
                     if (merchant) {
                         merchantData = {
                             id: merchant.id,
@@ -85,7 +114,7 @@ function createAuthRoutes(db) {
                 }
 
                 // Get user with profile_image_url
-                const createdUser = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+                const createdUser = await db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 
                 // Generate JWT token
                 const token = jwt.sign(
@@ -140,7 +169,7 @@ function createAuthRoutes(db) {
 
             try {
                 // Find user
-                const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+                const user = await db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 
                 if (!user) {
                     return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
@@ -163,7 +192,7 @@ function createAuthRoutes(db) {
                 // Get merchant details if merchant
                 let merchantData = null;
                 if (user.role === 'merchant') {
-                    const merchant = db.prepare('SELECT * FROM merchants WHERE user_id = ?').get(user.id);
+                    const merchant = await db.prepare('SELECT * FROM merchants WHERE user_id = ?').get(user.id);
                     if (merchant) {
                         merchantData = {
                             id: merchant.id,
@@ -227,7 +256,12 @@ function createAuthRoutes(db) {
             if (longitude !== undefined) { updates.push('longitude = ?'); params.push(longitude); }
             if (req.body.profileImageBase64 !== undefined) { 
                 updates.push('profile_image_url = ?'); 
-                params.push(req.body.profileImageBase64); 
+                // Ensure proper format: if it's already a data URI, use it; otherwise add prefix
+                let imageData = req.body.profileImageBase64;
+                if (imageData && !imageData.startsWith('data:')) {
+                    imageData = `data:image/jpeg;base64,${imageData}`;
+                }
+                params.push(imageData || null); 
             }
             // For customers, phone is stored in users table
             if (req.user.role === 'customer' && phone !== undefined) { 
@@ -237,13 +271,13 @@ function createAuthRoutes(db) {
 
             if (updates.length > 0) {
                 params.push(userId);
-                db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+                await db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
             }
 
             // Update password if provided
             if (password) {
                 const hashedPassword = await bcrypt.hash(password, 10);
-                db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, userId);
+                await db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, userId);
             }
 
             // Update merchant info if applicable
@@ -256,26 +290,36 @@ function createAuthRoutes(db) {
                 if (phone) { merchantUpdates.push('phone = ?'); merchantParams.push(phone); }
                 if (req.body.coverImageBase64 !== undefined) { 
                     merchantUpdates.push('cover_image_url = ?'); 
-                    merchantParams.push(req.body.coverImageBase64); 
+                    // Ensure proper format
+                    let imageData = req.body.coverImageBase64;
+                    if (imageData && !imageData.startsWith('data:')) {
+                        imageData = `data:image/jpeg;base64,${imageData}`;
+                    }
+                    merchantParams.push(imageData || null); 
                 }
                 if (req.body.logoImageBase64 !== undefined) { 
                     merchantUpdates.push('logo_url = ?'); 
-                    merchantParams.push(req.body.logoImageBase64); 
+                    // Ensure proper format
+                    let imageData = req.body.logoImageBase64;
+                    if (imageData && !imageData.startsWith('data:')) {
+                        imageData = `data:image/jpeg;base64,${imageData}`;
+                    }
+                    merchantParams.push(imageData || null); 
                 }
 
                 if (merchantUpdates.length > 0) {
                     merchantParams.push(userId);
-                    db.prepare(`UPDATE merchants SET ${merchantUpdates.join(', ')} WHERE user_id = ?`).run(...merchantParams);
+                    await db.prepare(`UPDATE merchants SET ${merchantUpdates.join(', ')} WHERE user_id = ?`).run(...merchantParams);
                 }
             }
 
             // Fetch updated user to return
-            const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+            const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 
             // Get merchant details if merchant
             let merchantData = null;
             if (user.role === 'merchant') {
-                const merchant = db.prepare('SELECT * FROM merchants WHERE user_id = ?').get(user.id);
+                const merchant = await db.prepare('SELECT * FROM merchants WHERE user_id = ?').get(user.id);
                 if (merchant) {
                     merchantData = {
                         id: merchant.id,
@@ -321,12 +365,12 @@ function createAuthRoutes(db) {
      * DELETE /api/auth/delete
      * Delete user account
      */
-    router.delete('/delete', authenticate, (req, res) => {
+    router.delete('/delete', authenticate, async (req, res) => {
         const userId = req.user.userId;
 
         try {
             // Because of ON DELETE CASCADE, deleting user will delete merchant info, baskets, and reservations
-            db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+            await db.prepare('DELETE FROM users WHERE id = ?').run(userId);
 
             res.json({ message: 'Compte supprimé avec succès' });
         } catch (error) {
